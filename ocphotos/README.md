@@ -32,6 +32,9 @@ expuesto en el mismo origen como `/ocphotos-api/`.
   desde el visor o desde la rejilla del timeline (botón +).
 - **Lugares**: agrupación de fotos con GPS por zona (~1 km) con **geocodificación
   inversa** (Nominatim, cacheada en SQLite) y vista con portada.
+- **Etiquetas**: manuales (añadir/quitar desde el visor); vista con recuento.
+- **Carpetas**: navegación por el árbol de carpetas de OpenCloud (derivado del
+  índice) con migas de pan, subcarpetas y fotos.
 - **i18n**: traducciones al español en `l10n/translations.json` (sigue el idioma
   del host).
 - Registrada en el **conmutador de aplicaciones** (appMenuItem).
