@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -268,15 +269,30 @@ func (s *Store) SetFavorite(ctx context.Context, id int64, fav bool) error {
 	return err
 }
 
-// OnThisDay: fotos de este mes-día en años anteriores.
-func (s *Store) OnThisDay(ctx context.Context, month, day, thisYear int) ([]Asset, error) {
+// OnThisDay: fotos de este mes-día (o ±dayRange días) en años anteriores.
+func (s *Store) OnThisDay(ctx context.Context, month, day, thisYear, dayRange int) ([]Asset, error) {
+	// pares (mes, día) del rango, evitando duplicados
+	base := time.Date(2000, time.Month(month), day, 12, 0, 0, 0, time.UTC)
+	seen := map[[2]int]bool{}
+	var conds []string
+	var args []any
+	for j := -dayRange; j <= dayRange; j++ {
+		t := base.AddDate(0, 0, j)
+		k := [2]int{int(t.Month()), t.Day()}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		conds = append(conds, `(CAST(strftime('%m', taken_at, 'unixepoch') AS INT) = ? AND CAST(strftime('%d', taken_at, 'unixepoch') AS INT) = ?)`)
+		args = append(args, k[0], k[1])
+	}
+	args = append(args, thisYear)
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+assetCols+` FROM assets
 		 WHERE deleted_at IS NULL
-		   AND CAST(strftime('%m', taken_at, 'unixepoch') AS INT) = ?
-		   AND CAST(strftime('%d', taken_at, 'unixepoch') AS INT) = ?
+		   AND (`+strings.Join(conds, " OR ")+`)
 		   AND CAST(strftime('%Y', taken_at, 'unixepoch') AS INT) < ?
-		 ORDER BY taken_at DESC`, month, day, thisYear)
+		 ORDER BY taken_at DESC`, args...)
 	if err != nil {
 		return nil, err
 	}

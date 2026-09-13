@@ -49,9 +49,14 @@ func TestStoreRoundtrip(t *testing.T) {
 		t.Fatalf("favs: %d", len(favs))
 	}
 
-	otd, err := st.OnThisDay(ctx, int(now.Month()), now.Day(), now.Year())
+	otd, err := st.OnThisDay(ctx, int(now.Month()), now.Day(), now.Year(), 0)
 	if err != nil || len(otd) != 1 {
 		t.Fatalf("onThisDay: %d %v", len(otd), err)
+	}
+	// con rango ±3 debe seguir encontrando la del mismo día
+	otdR, err := st.OnThisDay(ctx, int(now.Month()), now.Day(), now.Year(), 3)
+	if err != nil || len(otdR) != 1 {
+		t.Fatalf("onThisDay rango: %d %v", len(otdR), err)
 	}
 
 	lat, lon := 40.4, -3.7

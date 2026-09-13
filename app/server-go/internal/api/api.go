@@ -281,13 +281,20 @@ func (s *Server) original(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) onThisDay(w http.ResponseWriter, r *http.Request) {
+	// rango de días alrededor de hoy (±3 por defecto, como Memories)
+	days := 3
+	if v := r.URL.Query().Get("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 30 {
+			days = n
+		}
+	}
 	now := time.Now()
-	list, err := s.st.OnThisDay(r.Context(), int(now.Month()), now.Day(), now.Year())
+	list, err := s.st.OnThisDay(r.Context(), int(now.Month()), now.Day(), now.Year(), days)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	writeJSON(w, map[string]any{"assets": list})
+	writeJSON(w, map[string]any{"assets": list, "days": days})
 }
 
 func (s *Server) calendar(w http.ResponseWriter, r *http.Request) {

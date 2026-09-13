@@ -22,6 +22,14 @@
 
     <div v-else class="photos-body">
       <div class="photos-scroll">
+        <!-- On this day: "hace X años" (como Memories) -->
+        <div v-if="onThisDay.length" class="otd">
+          <button v-for="y in onThisDay" :key="y.year" class="otd-card" @click="jumpToPhoto(y.photo)">
+            <img :src="thumbSrc(y.photo)" :alt="y.label" loading="lazy" @error="onImgError" />
+            <span class="otd-label" v-text="y.label" />
+          </button>
+        </div>
+
         <section v-for="m in months" :key="m.key" class="photos-month">
           <h2 class="photos-month-header">{{ m.label }}</h2>
           <section v-for="day in m.days" :key="day.key" class="photos-day">
@@ -75,6 +83,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { useGettext } from 'vue3-gettext'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
@@ -82,13 +91,31 @@ export default defineComponent({
   name: 'TimelineView',
   components: { ViewerOverlay },
   setup() {
+    const { $gettext } = useGettext()
     const {
       photos, loading, error, months, exhausted, startAt,
-      init, loadMore, jumpTo, fetchCalendar, rescan, previews, ensurePreview, ensureOriginal, openPreview
+      init, loadMore, jumpTo, fetchCalendar, fetchOnThisDay, rescan, previews, ensurePreview, ensureOriginal, openPreview
     } = usePhotoLibrary()
 
     const sentinel = ref<HTMLElement | null>(null)
     const years = ref<{ year: number; count: number }[]>([])
+
+    // On this day: una tarjeta por año (la foto más reciente de ese año)
+    const otdPhotos = ref<Photo[]>([])
+    const currentYear = new Date().getFullYear()
+    const onThisDay = computed(() => {
+      const byYear = new Map<number, Photo>()
+      for (const p of otdPhotos.value) {
+        const y = new Date(p.takenAt * 1000).getFullYear()
+        if (!byYear.has(y)) byYear.set(y, p)
+      }
+      return [...byYear.entries()]
+        .sort(([a], [b]) => b - a)
+        .map(([year, photo]) => ({ year, photo, label: $gettext('%{n} years ago', { n: currentYear - year }) }))
+    })
+    const jumpToPhoto = (p: Photo): void => {
+      void jumpTo(p.takenAt)
+    }
 
     const topYear = computed(() => (photos.value[0] ? new Date(photos.value[0].takenAt * 1000).getFullYear() : null))
 
@@ -133,6 +160,12 @@ export default defineComponent({
       } catch {
         /* sin scrubber si falla */
       }
+      try {
+        otdPhotos.value = await fetchOnThisDay(3)
+        for (const p of otdPhotos.value.slice(0, 12)) void ensurePreview(p, 400)
+      } catch {
+        /* sin tira on-this-day si falla */
+      }
       const obs = new IntersectionObserver(
         (entries) => {
           if (entries[0].isIntersecting && !exhausted.value) void loadMore()
@@ -143,7 +176,7 @@ export default defineComponent({
     })
 
     return {
-      photos, loading, error, months, years, topYear, startAt, sentinel,
+      photos, loading, error, months, years, topYear, startAt, sentinel, onThisDay, jumpToPhoto,
       viewerList, viewerIndex, openViewer, formatDay, onImgError, jumpTo, jumpToYear,
       rescan, thumbSrc, ensurePreview, ensureOriginal
     }
@@ -167,6 +200,17 @@ export default defineComponent({
 }
 .photos-body { flex: 1; min-height: 0; display: flex; }
 .photos-scroll { flex: 1; overflow-y: auto; padding: 0 8px; }
+/* On this day */
+.otd { display: flex; gap: 8px; overflow-x: auto; padding: 10px 4px; }
+.otd-card {
+  position: relative; flex: 0 0 auto; width: 150px; height: 110px; padding: 0; border: 0;
+  border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--oc-role-surface-container, #f6f8fa);
+}
+.otd-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.otd-label {
+  position: absolute; left: 6px; bottom: 6px; color: #fff; font-size: 0.78rem; font-weight: 600;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.75);
+}
 .photos-month-header {
   position: sticky; top: 0; z-index: 2; margin: 0; padding: 10px 4px 6px;
   font-size: 1rem; font-weight: 700; text-transform: capitalize;

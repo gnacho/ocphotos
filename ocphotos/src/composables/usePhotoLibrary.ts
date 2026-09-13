@@ -245,8 +245,8 @@ export function usePhotoLibrary() {
     return (json.assets ?? []).map(toPhoto)
   }
 
-  const fetchOnThisDay = async (): Promise<Photo[]> => {
-    const res = await api('/api/memories/on-this-day')
+  const fetchOnThisDay = async (days = 3): Promise<Photo[]> => {
+    const res = await api(`/api/memories/on-this-day?days=${days}`)
     const json = (await res.json()) as { assets?: ApiAsset[] }
     return (json.assets ?? []).map(toPhoto)
   }
