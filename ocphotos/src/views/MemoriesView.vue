@@ -2,7 +2,7 @@
   <div class="memories-view">
     <div class="memories-toolbar">
       <h1 v-text="$gettext('Un día como hoy…')" />
-      <router-link :to="{ name: 'photos-timeline' }" v-text="$gettext('Timeline')" />
+      <router-link to="/ocphotos/timeline" v-text="$gettext('Timeline')" />
     </div>
 
     <div v-if="loading" class="memories-note" v-text="$gettext('Indexando…')" />
@@ -11,14 +11,14 @@
     <div v-else class="memories-scroll">
       <section v-for="[year, list] in years" :key="year" class="memories-year">
         <button class="memories-hero" @click="openViewer(list, 0)">
-          <img :src="previewUrl(list[0], 800)" :alt="String(year)" />
+          <img :src="thumbSrc(list[0], 800)" :alt="String(year)" />
           <span class="memories-hero-label">
             {{ $gettext('Hace %{n} años', { n: currentYear - year }) }} · {{ list.length }}
           </span>
         </button>
         <div class="memories-strip">
           <button v-for="(p, i) in list.slice(1, 9)" :key="p.path" class="memories-thumb" @click="openViewer(list, i + 1)">
-            <img :src="previewUrl(p, 200)" :alt="p.name" loading="lazy" />
+            <img :src="thumbSrc(p, 200)" :alt="p.name" loading="lazy" />
           </button>
         </div>
       </section>
@@ -28,8 +28,8 @@
       v-if="viewerList"
       :photos="viewerList"
       :index="viewerIndex"
-      :preview-url="previewUrl"
-      :file-url="fileUrl"
+      :ensure-preview="ensurePreview"
+      :ensure-original="ensureOriginal"
       @close="viewerList = null"
       @navigate="viewerIndex = $event"
     />
@@ -37,7 +37,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
@@ -45,9 +45,19 @@ export default defineComponent({
   name: 'MemoriesView',
   components: { ViewerOverlay },
   setup() {
-    const { loading, onThisDay, init, previewUrl, fileUrl } = usePhotoLibrary()
+    const { loading, onThisDay, init, previews, ensurePreview, ensureOriginal } = usePhotoLibrary()
     const currentYear = new Date().getFullYear()
     const years = computed(() => [...onThisDay.value.entries()])
+
+    const thumbSrc = (p: Photo, size: number) => previews.value[`${p.path}|${size}|thumbnail`]
+
+    watch(
+      years,
+      (list) => {
+        for (const [, photos] of list) for (const p of photos.slice(0, 9)) void ensurePreview(p, 400, 'thumbnail')
+      },
+      { immediate: true }
+    )
 
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
@@ -57,7 +67,7 @@ export default defineComponent({
     }
 
     onMounted(() => init('/Fotos'))
-    return { loading, years, currentYear, viewerList, viewerIndex, openViewer, previewUrl, fileUrl }
+    return { loading, years, currentYear, viewerList, viewerIndex, openViewer, thumbSrc, ensurePreview, ensureOriginal }
   }
 })
 </script>

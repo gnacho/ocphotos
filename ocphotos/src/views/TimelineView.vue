@@ -7,7 +7,7 @@
       <oc-button appearance="raw" :aria-label="$gettext('Reescanear')" @click="rescan(rootPath)">
         <oc-icon name="refresh" size="small" />
       </oc-button>
-      <router-link :to="{ name: 'photos-memories' }" class="photos-nav" v-text="$gettext('Recuerdos')" />
+      <router-link to="/ocphotos/memories" class="photos-nav" v-text="$gettext('Recuerdos')" />
     </div>
 
     <div v-if="error" class="photos-error" v-text="error" />
@@ -26,7 +26,7 @@
             class="photos-cell"
             @click="openViewer(day.photos, p)"
           >
-            <img :src="previewUrl(p, 400)" :alt="p.name" loading="lazy" @error="onImgError" />
+            <img :src="thumbSrc(p)" :alt="p.name" loading="lazy" @error="onImgError" />
             <span v-if="p.isVideo" class="photos-video-badge">▶</span>
           </button>
         </div>
@@ -38,8 +38,8 @@
       v-if="viewerList"
       :photos="viewerList"
       :index="viewerIndex"
-      :preview-url="previewUrl"
-      :file-url="fileUrl"
+      :ensure-preview="ensurePreview"
+      :ensure-original="ensureOriginal"
       @close="viewerList = null"
       @navigate="viewerIndex = $event"
     />
@@ -47,7 +47,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
@@ -57,13 +57,26 @@ export default defineComponent({
   name: 'TimelineView',
   components: { ViewerOverlay },
   setup() {
-    const { photos, loading, progress, error, days, init, rescan, previewUrl, fileUrl } = usePhotoLibrary()
+    const { photos, loading, progress, error, days, init, rescan, previews, ensurePreview, ensureOriginal } =
+      usePhotoLibrary()
     // carpeta raíz dentro del espacio personal (equivale a SCAN_ROOT del backend)
     const rootPath = '/Fotos'
 
     const dayCount = ref(PAGE_DAYS)
     const sentinel = ref<HTMLElement | null>(null)
     const visibleDays = computed(() => days.value.slice(0, dayCount.value))
+
+    const thumbKey = (p: Photo) => `${p.path}|400|thumbnail`
+    const thumbSrc = (p: Photo) => previews.value[thumbKey(p)]
+
+    // carga perezosa de miniaturas: solo lo visible (y crece con el scroll)
+    watch(
+      visibleDays,
+      (list) => {
+        for (const day of list) for (const p of day.photos) void ensurePreview(p, 400, 'thumbnail')
+      },
+      { immediate: true }
+    )
 
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
@@ -76,7 +89,7 @@ export default defineComponent({
       new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
 
     const onImgError = (e: Event) => {
-      // formatos sin preview (HEIC/RAW): placeholder neutro
+      // formatos sin preview (HEIC/RAW/vídeo): placeholder neutro
       const el = e.target as HTMLImageElement
       el.style.opacity = '0.15'
       el.onerror = null
@@ -96,7 +109,7 @@ export default defineComponent({
     return {
       photos, loading, progress, error, visibleDays, sentinel,
       viewerList, viewerIndex, openViewer, formatDay, onImgError,
-      rescan, rootPath, previewUrl, fileUrl
+      rescan, rootPath, thumbSrc, ensurePreview, ensureOriginal
     }
   }
 })

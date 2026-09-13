@@ -1,10 +1,12 @@
 import { computed, ref } from 'vue'
-import { useClientService, useSpacesStore } from '@opencloud-eu/web-pkg'
-import { urlJoin } from '@opencloud-eu/web-client'
+import { useClientService, usePreviewService, useSpacesStore } from '@opencloud-eu/web-pkg'
+import type { ProcessorType } from '@opencloud-eu/web-pkg'
 import type { Resource, SpaceResource } from '@opencloud-eu/web-client'
 
 export interface Photo {
+  id: string
   path: string
+  webDavPath: string
   name: string
   etag: string
   mtime: number // segundos
@@ -33,7 +35,9 @@ const toPhoto = (r: Resource): Photo | null => {
   const isVideo = VIDEO_EXT.includes(e) || (r.mimeType ?? '').startsWith('video/')
   if (!isImage && !isVideo) return null
   return {
+    id: r.id ?? '',
     path: r.path,
+    webDavPath: (r as any).webDavPath ?? '',
     name: r.name,
     etag: r.etag ?? '',
     mtime: r.mdate ? Math.floor(new Date(r.mdate).getTime() / 1000) : 0,
@@ -43,10 +47,10 @@ const toPhoto = (r: Resource): Photo | null => {
   }
 }
 
-// caché en localStorage: lista de fotos + firma del árbol (etag de la raíz).
-// En rescans posteriores, si el etag raíz no cambió y no hay cambios profundos,
-// el usuario puede forzar rescan. v1: escaneo completo por sesión + caché.
-const CACHE_KEY = 'ocphotos.cache.v1'
+// caché en localStorage: lista de fotos. v2 incluye id/webDavPath (necesarios para
+// pedir miniaturas autenticadas al servidor). La caché de previews vive en memoria
+// (blob URLs), no se serializa.
+const CACHE_KEY = 'ocphotos.cache.v2'
 const CACHE_TTL = 6 * 3600 * 1000
 
 const state = {
@@ -58,8 +62,16 @@ const state = {
   initialized: false
 }
 
+// blob URLs de previews y originales, indexados por clave; en memoria por sesión
+const previews = ref<Record<string, string>>({})
+const originals = ref<Record<string, string>>({})
+
+const previewKey = (p: Photo, size: number, processor: ProcessorType) => `${p.path}|${size}|${processor}`
+const originalKey = (p: Photo) => `${p.path}|original`
+
 export function usePhotoLibrary() {
   const clientService = useClientService()
+  const previewService = usePreviewService()
   const spacesStore = useSpacesStore()
 
   const personalSpace = computed<SpaceResource | null>(() => {
@@ -172,20 +184,57 @@ export function usePhotoLibrary() {
     return new Map([...groups.entries()].sort(([a], [b]) => b - a))
   })
 
-  /** URL de miniatura servida por OpenCloud (sesión del host, sin tokens). */
-  const previewUrl = (p: Photo, size = 400): string => {
+  // Resource mínimo para la API de previews: solo necesita id/etag/webDavPath y
+  // los métodos de capacidad, así que sirve tanto para fotos recién escaneadas
+  // como para las que vienen de la caché de localStorage.
+  const asResource = (p: Photo): Resource =>
+    ({
+      id: p.id,
+      etag: p.etag,
+      webDavPath: p.webDavPath,
+      mimeType: p.mime,
+      canDownload: () => true,
+      hasPreview: () => !p.isVideo
+    }) as unknown as Resource
+
+  /** Pide (y cachea) una preview autenticada al servidor; devuelve un blob URL. */
+  const ensurePreview = async (p: Photo, size = 400, processor: ProcessorType = 'thumbnail'): Promise<string> => {
+    const key = previewKey(p, size, processor)
+    if (previews.value[key]) return previews.value[key]
     const space = personalSpace.value
-    if (!space) return ''
-    const base = (space as any).webDavPath ?? urlJoin('/dav/spaces', space.id)
-    return urlJoin(base, p.path) + `?x=${size}&y=${size}&processor=thumbnail&scalingup=0`
+    if (!space || !p.id || !p.webDavPath) return ''
+    try {
+      const url = await previewService.loadPreview({
+        space,
+        resource: asResource(p),
+        dimensions: [size, size],
+        processor
+      })
+      if (url) previews.value[key] = url
+      return url ?? ''
+    } catch {
+      return ''
+    }
   }
 
-  /** URL del original vía WebDAV (descarga/visualización en sesión). */
-  const fileUrl = (p: Photo): string => {
+  /** Descarga el fichero original con la sesión del host; devuelve un blob URL. */
+  const ensureOriginal = async (p: Photo): Promise<string> => {
+    const key = originalKey(p)
+    if (originals.value[key]) return originals.value[key]
     const space = personalSpace.value
     if (!space) return ''
-    const base = (space as any).webDavPath ?? urlJoin('/dav/spaces', space.id)
-    return urlJoin(base, p.path)
+    try {
+      const { body } = await clientService.webdav.getFileContents(
+        space,
+        { path: p.path },
+        { responseType: 'blob', noCache: true }
+      )
+      const url = window.URL.createObjectURL(body)
+      originals.value[key] = url
+      return url
+    } catch {
+      return ''
+    }
   }
 
   return {
@@ -197,7 +246,9 @@ export function usePhotoLibrary() {
     onThisDay,
     init,
     rescan: (root: string) => scan(root, true),
-    previewUrl,
-    fileUrl
+    previews,
+    originals,
+    ensurePreview,
+    ensureOriginal
   }
 }
