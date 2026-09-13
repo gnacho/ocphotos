@@ -17,6 +17,7 @@ import (
 	_ "image/png"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/opencloud-memories/photos-service/internal/dav"
@@ -42,6 +43,52 @@ func New(c *dav.Client, cacheDir string) (*Service, error) {
 func cacheKey(href, etag string, maxSize int) string {
 	h := sha1.Sum([]byte(fmt.Sprintf("%s|%s|%d", href, etag, maxSize)))
 	return hex.EncodeToString(h[:]) + ".jpg"
+}
+
+// VideoPoster extrae un fotograma del vídeo con ffmpeg y lo cachea como JPEG.
+// Descarga el vídeo a un temporal (ffmpeg necesita poder buscar en el fichero).
+func (s *Service) VideoPoster(ctx context.Context, href, etag string, maxSize int) (string, error) {
+	key := "v" + cacheKey(href, etag, maxSize)
+	out := filepath.Join(s.cacheDir, key[:2], key)
+	if _, err := os.Stat(out); err == nil {
+		return out, nil
+	}
+
+	rc, _, err := s.dav.Download(ctx, href)
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return "", err
+	}
+	tmpIn := out + ".in"
+	f, err := os.Create(tmpIn)
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(f, io.LimitReader(rc, 2<<30)); err != nil {
+		f.Close()
+		os.Remove(tmpIn)
+		return "", err
+	}
+	f.Close()
+	defer os.Remove(tmpIn)
+
+	tmpOut := out + ".tmp.jpg" // ffmpeg infiere el formato por la extensión
+	// primer intento en el segundo 1; si el vídeo es más corto, desde el principio
+	for _, ss := range []string{"1", "0"} {
+		cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-ss", ss, "-i", tmpIn,
+			"-frames:v", "1", "-vf", fmt.Sprintf("scale=%d:-1", maxSize), tmpOut)
+		if err := cmd.Run(); err == nil {
+			if st, err := os.Stat(tmpOut); err == nil && st.Size() > 0 {
+				return out, os.Rename(tmpOut, out)
+			}
+		}
+		os.Remove(tmpOut)
+	}
+	return "", errors.New("ffmpeg no pudo extraer un fotograma")
 }
 
 // Get devuelve la ruta del thumbnail en caché, generándolo si hace falta.

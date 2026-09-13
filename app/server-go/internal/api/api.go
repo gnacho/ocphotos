@@ -330,8 +330,15 @@ func (s *Server) thumbHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if a.MediaType == "video" {
-		// sin poster de vídeo en v1 (ffmpeg vendrá con la fase de transcoding)
-		http.Redirect(w, r, "/api/assets/"+r.PathValue("id")+"/original", http.StatusFound)
+		// póster del vídeo con ffmpeg; si falla, se sirve el original
+		file, err := s.thumbs.VideoPoster(r.Context(), a.Path, etagFor(a), maxSize)
+		if err != nil {
+			s.log.Warn("video poster", "id", id, "err", err)
+			http.Redirect(w, r, "/api/assets/"+r.PathValue("id")+"/original", http.StatusFound)
+			return
+		}
+		w.Header().Set("Cache-Control", "public, max-age=2592000, immutable")
+		http.ServeFile(w, r, file)
 		return
 	}
 	// necesitamos el etag para la clave de caché: está en path→etag; lo pedimos
