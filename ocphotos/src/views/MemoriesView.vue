@@ -66,7 +66,7 @@ export default defineComponent({
       viewerIndex.value = i
     }
 
-    onMounted(() => init('/Fotos'))
+    onMounted(() => init())
     return { loading, years, currentYear, viewerList, viewerIndex, openViewer, thumbSrc, ensurePreview, ensureOriginal }
   }
 })

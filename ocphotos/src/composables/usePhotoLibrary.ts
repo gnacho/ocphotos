@@ -47,17 +47,28 @@ const toPhoto = (r: Resource): Photo | null => {
   }
 }
 
-// caché en localStorage: lista de fotos. v2 incluye id/webDavPath (necesarios para
-// pedir miniaturas autenticadas al servidor). La caché de previews vive en memoria
-// (blob URLs), no se serializa.
-const CACHE_KEY = 'ocphotos.cache.v2'
+// caché en localStorage: lista de fotos. v3 incluye id/webDavPath (necesarios para
+// pedir miniaturas autenticadas al servidor) y la raíz escaneada. La caché de
+// previews vive en memoria (blob URLs), no se serializa.
+const CACHE_KEY = 'ocphotos.cache.v3'
 const CACHE_TTL = 6 * 3600 * 1000
+const STORED_ROOT = 'ocphotos.root'
+const FALLBACK_ROOT = '/Fotos'
+
+// raíz por defecto, configurable desde apps.yaml (ocphotos.config.rootPath). La
+// elección del usuario en la UI (localStorage) tiene prioridad sobre el default.
+let configuredRoot = FALLBACK_ROOT
+export function setConfiguredRoot(path?: string) {
+  if (path && typeof path === 'string' && path.trim()) configuredRoot = path.trim()
+}
 
 const state = {
   photos: ref<Photo[]>([]),
   loading: ref(false),
   progress: ref(''),
   error: ref<string | null>(null),
+  root: ref<string>(''),
+  rootMissing: ref(false),
   space: ref<SpaceResource | null>(null),
   initialized: false
 }
@@ -80,11 +91,12 @@ export function usePhotoLibrary() {
     return spaces[0] ?? null
   })
 
-  const loadCache = (): Photo[] | null => {
+  const loadCache = (root: string): Photo[] | null => {
     try {
       const raw = localStorage.getItem(CACHE_KEY)
       if (!raw) return null
-      const { at, photos } = JSON.parse(raw)
+      const { at, root: cachedRoot, photos } = JSON.parse(raw)
+      if (cachedRoot !== root) return null
       if (Date.now() - at > CACHE_TTL) return null
       return photos
     } catch {
@@ -92,9 +104,9 @@ export function usePhotoLibrary() {
     }
   }
 
-  const saveCache = (photos: Photo[]) => {
+  const saveCache = (root: string, photos: Photo[]) => {
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), photos }))
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), root, photos }))
     } catch {
       // localStorage lleno con librerías muy grandes: se omite la caché
     }
@@ -105,14 +117,16 @@ export function usePhotoLibrary() {
     if (state.loading.value) return
     state.loading.value = true
     state.error.value = null
+    state.rootMissing.value = false
     try {
       const space = personalSpace.value
       if (!space) throw new Error('Espacio personal no disponible')
 
       if (!force) {
-        const cached = loadCache()
+        const cached = loadCache(root)
         if (cached) {
           state.photos.value = cached
+          state.root.value = root
           state.loading.value = false
           return
         }
@@ -121,6 +135,7 @@ export function usePhotoLibrary() {
       const found: Photo[] = []
       const queue = [root]
       let folders = 0
+      let first = true
       while (queue.length) {
         const current = queue.shift()!
         state.progress.value = `${folders} carpetas · ${found.length} fotos`
@@ -129,8 +144,12 @@ export function usePhotoLibrary() {
           const res = await clientService.webdav.listFiles(space, { path: current })
           children = res.children
         } catch {
-          continue // carpeta inaccesible: se omite
+          // una raíz inaccesible se distingue de una raíz vacía para la UI
+          if (first) state.rootMissing.value = true
+          first = false
+          continue
         }
+        first = false
         folders++
         for (const c of children) {
           if (c.type === 'folder') queue.push(c.path)
@@ -142,7 +161,8 @@ export function usePhotoLibrary() {
       }
       found.sort((a, b) => b.mtime - a.mtime)
       state.photos.value = found
-      saveCache(found)
+      state.root.value = root
+      saveCache(root, found)
     } catch (e: any) {
       state.error.value = e?.message ?? String(e)
     } finally {
@@ -151,10 +171,29 @@ export function usePhotoLibrary() {
     }
   }
 
-  const init = async (root: string) => {
+  const init = async (root?: string) => {
     if (state.initialized) return
     state.initialized = true
-    await scan(root)
+    const stored = localStorage.getItem(STORED_ROOT)
+    await scan(root ?? stored ?? configuredRoot)
+  }
+
+  /** Cambia la raíz escaneada (elección del usuario) y reescanea. */
+  const setRoot = async (root: string) => {
+    try {
+      localStorage.setItem(STORED_ROOT, root)
+    } catch {
+      // sin persistencia: se aplica solo en esta sesión
+    }
+    await scan(root, true)
+  }
+
+  /** Subcarpetas de una ruta, para el selector de carpeta. */
+  const listFolders = async (path: string): Promise<Resource[]> => {
+    const space = personalSpace.value
+    if (!space) return []
+    const res = await clientService.webdav.listFiles(space, { path })
+    return res.children.filter((c) => c.type === 'folder')
   }
 
   const days = computed<DayBucket[]>(() => {
@@ -242,9 +281,13 @@ export function usePhotoLibrary() {
     loading: state.loading,
     progress: state.progress,
     error: state.error,
+    root: state.root,
+    rootMissing: state.rootMissing,
     days,
     onThisDay,
     init,
+    setRoot,
+    listFolders,
     rescan: (root: string) => scan(root, true),
     previews,
     originals,
