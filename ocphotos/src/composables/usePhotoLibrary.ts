@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { useAuthStore } from '@opencloud-eu/web-pkg'
+import { useAuthStore, useRouter, useSpacesStore } from '@opencloud-eu/web-pkg'
 import type { ProcessorType } from '@opencloud-eu/web-pkg'
 
 // backend photos-service (mismo origen, vía NPM). Mantiene el índice (EXIF, geo,
@@ -87,8 +87,17 @@ const state = {
 const previews = ref<Record<string, string>>({})
 const originals = ref<Record<string, string>>({})
 
+// formatos que cubre la app nativa de preview de OpenCloud (web-app-preview).
+// HEIC/HEIF y RAW NO están: para esos usamos nuestro visor (preview del backend).
+const NATIVE_PREVIEW_EXT = [
+  '.jpg', '.jpeg', '.png', '.gif', '.tiff', '.tif', '.bmp', '.webp', '.svg',
+  '.mp4', '.mov', '.m4v', '.webm'
+]
+
 export function usePhotoLibrary() {
   const authStore = useAuthStore()
+  const router = useRouter()
+  const spacesStore = useSpacesStore()
 
   const api = async (path: string, init?: RequestInit): Promise<Response> => {
     const token = authStore.accessToken
@@ -207,6 +216,30 @@ export function usePhotoLibrary() {
     return (json.assets ?? []).map(toPhoto)
   }
 
+  const ext = (name: string) => {
+    const i = name.lastIndexOf('.')
+    return i >= 0 ? name.slice(i).toLowerCase() : ''
+  }
+
+  const canNativePreview = (p: Photo): boolean => NATIVE_PREVIEW_EXT.includes(ext(p.name))
+
+  /** URL del visor nativo de OpenCloud (/preview/<driveAliasAndItem>). */
+  const nativePreviewUrl = (p: Photo): string => {
+    const alias = spacesStore.personalSpace?.driveAlias ?? ''
+    const rel = p.path.replace(/^\/dav\/spaces\/[^/]+\//, '')
+    return `/preview/${alias}/${rel}`
+  }
+
+  /** Abre la foto en el visor nativo si el formato está soportado. Devuelve true
+   *  si delegó; false si hay que usar el visor propio (HEIC/RAW). */
+  const openPreview = (p: Photo): boolean => {
+    if (!canNativePreview(p)) return false
+    const space = spacesStore.personalSpace
+    if (!space) return false
+    void router.push(nativePreviewUrl(p))
+    return true
+  }
+
   const fetchFavorites = async (): Promise<Photo[]> => {
     const res = await api('/api/assets?favorites=1&limit=2000')
     const json = (await res.json()) as { assets?: ApiAsset[] }
@@ -228,6 +261,9 @@ export function usePhotoLibrary() {
     fetchGeo,
     fetchOnThisDay,
     fetchFavorites,
+    canNativePreview,
+    nativePreviewUrl,
+    openPreview,
     previews
   }
 }

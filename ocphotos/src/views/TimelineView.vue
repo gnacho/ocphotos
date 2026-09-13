@@ -58,7 +58,7 @@ export default defineComponent({
   name: 'TimelineView',
   components: { ViewerOverlay },
   setup() {
-    const { photos, loading, error, days, exhausted, init, loadMore, rescan, previews, ensurePreview, ensureOriginal } =
+    const { photos, loading, error, days, exhausted, init, loadMore, rescan, previews, ensurePreview, ensureOriginal, openPreview } =
       usePhotoLibrary()
 
     const sentinel = ref<HTMLElement | null>(null)
@@ -76,7 +76,9 @@ export default defineComponent({
 
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
+    // formatos que el host sabe previsualizar -> visor nativo; HEIC/RAW -> el propio
     const openViewer = (list: Photo[], p: Photo) => {
+      if (openPreview(p)) return
       viewerList.value = list
       viewerIndex.value = list.indexOf(p)
     }

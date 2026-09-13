@@ -37,7 +37,7 @@ export default defineComponent({
   name: 'MapView',
   components: { ViewerOverlay },
   setup() {
-    const { fetchGeo, ensurePreview, ensureOriginal } = usePhotoLibrary()
+    const { fetchGeo, ensurePreview, ensureOriginal, openPreview } = usePhotoLibrary()
     const loading = ref(true)
     const photos = ref<Photo[]>([])
     const mapEl = ref<HTMLElement | null>(null)
@@ -69,6 +69,8 @@ export default defineComponent({
         })
           .addTo(map!)
           .on('click', () => {
+            const p = photos.value[i]
+            if (openPreview(p)) return
             viewerList.value = photos.value
             viewerIndex.value = i
           })
