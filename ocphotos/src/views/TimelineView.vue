@@ -2,30 +2,21 @@
   <div class="photos-view">
     <div class="photos-toolbar">
       <h1 class="photos-title" v-text="$gettext('Photos')" />
-      <button class="photos-folder" :title="$gettext('Change folder')" @click="pickerOpen = true">
-        <oc-icon name="folder" size="small" />
-        <span v-text="rootLabel" />
-      </button>
-      <span v-if="loading" class="photos-progress" v-text="progress || $gettext('Indexing…')" />
+      <span v-if="loading" class="photos-progress" v-text="$gettext('Loading…')" />
       <span v-else class="photos-count" v-text="$gettext('%{n} items', { n: photos.length })" />
-      <oc-button appearance="raw" :aria-label="$gettext('Rescan')" @click="rescan(root)">
+      <oc-button appearance="raw" :aria-label="$gettext('Rescan')" @click="rescan">
         <oc-icon name="refresh" size="small" />
       </oc-button>
-      <router-link to="/ocphotos/memories" class="photos-nav" v-text="$gettext('Memories')" />
-    </div>
-
-    <div v-if="fallbackFrom && !loading" class="photos-banner">
-      <span v-text="$gettext('Folder %{root} does not exist; showing the whole personal space.', { root: fallbackFrom })" />
-      <oc-button appearance="raw" @click="pickerOpen = true">{{ $gettext('Choose folder') }}</oc-button>
+      <nav class="photos-nav">
+        <router-link to="/ocphotos/memories" v-text="$gettext('Memories')" />
+        <router-link to="/ocphotos/map" v-text="$gettext('Map')" />
+        <router-link to="/ocphotos/favorites" v-text="$gettext('Favorites')" />
+      </nav>
     </div>
 
     <div v-if="error" class="photos-error" v-text="error" />
     <div v-else-if="!loading && photos.length === 0" class="photos-empty">
-      <p v-if="rootMissing" v-text="$gettext('Folder %{root} does not exist in your space', { root: rootLabel })" />
-      <p v-else v-text="$gettext('No photos in %{root}', { root: rootLabel })" />
-      <oc-button appearance="filled" color-role="primary" @click="pickerOpen = true">
-        {{ $gettext('Choose folder') }}
-      </oc-button>
+      <p v-text="$gettext('No photos yet')" />
     </div>
 
     <div v-else class="photos-scroll">
@@ -34,7 +25,7 @@
         <div class="photos-grid">
           <button
             v-for="p in day.photos"
-            :key="p.path"
+            :key="p.id"
             class="photos-cell"
             @click="openViewer(day.photos, p)"
           >
@@ -55,52 +46,30 @@
       @close="viewerList = null"
       @navigate="viewerIndex = $event"
     />
-
-    <folder-picker
-      v-if="pickerOpen"
-      :current="root"
-      @close="pickerOpen = false"
-      @select="onSelectFolder"
-    />
   </div>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
-import { useGettext } from 'vue3-gettext'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
-import FolderPicker from '../components/FolderPicker.vue'
-
-const PAGE_DAYS = 14
 
 export default defineComponent({
   name: 'TimelineView',
-  components: { ViewerOverlay, FolderPicker },
+  components: { ViewerOverlay },
   setup() {
-    const { $gettext } = useGettext()
-    const { photos, loading, progress, error, days, root, rootMissing, fallbackFrom, init, setRoot, rescan, previews, ensurePreview, ensureOriginal } =
+    const { photos, loading, error, days, exhausted, init, loadMore, rescan, previews, ensurePreview, ensureOriginal } =
       usePhotoLibrary()
 
-    const rootLabel = computed(() => root.value || $gettext('whole space'))
-    const pickerOpen = ref(false)
-    const onSelectFolder = async (path: string) => {
-      pickerOpen.value = false
-      await setRoot(path)
-    }
-
-    const dayCount = ref(PAGE_DAYS)
     const sentinel = ref<HTMLElement | null>(null)
-    const visibleDays = computed(() => days.value.slice(0, dayCount.value))
+    const visibleDays = computed(() => days.value)
 
-    const thumbKey = (p: Photo) => `${p.path}|400|thumbnail`
-    const thumbSrc = (p: Photo) => previews.value[thumbKey(p)]
+    const thumbSrc = (p: Photo) => previews.value[`${p.id}|400`]
 
-    // carga perezosa de miniaturas: solo lo visible (y crece con el scroll)
     watch(
       visibleDays,
       (list) => {
-        for (const day of list) for (const p of day.photos) void ensurePreview(p, 400, 'thumbnail')
+        for (const day of list) for (const p of day.photos) void ensurePreview(p, 400)
       },
       { immediate: true }
     )
@@ -116,7 +85,6 @@ export default defineComponent({
       new Intl.DateTimeFormat(navigator.language || 'en', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
 
     const onImgError = (e: Event) => {
-      // formatos sin preview (HEIC/RAW/vídeo): placeholder neutro
       const el = e.target as HTMLImageElement
       el.style.opacity = '0.15'
       el.onerror = null
@@ -126,7 +94,7 @@ export default defineComponent({
       await init()
       const obs = new IntersectionObserver(
         (entries) => {
-          if (entries[0].isIntersecting && dayCount.value < days.value.length) dayCount.value += PAGE_DAYS
+          if (entries[0].isIntersecting && !exhausted.value) void loadMore()
         },
         { rootMargin: '1500px' }
       )
@@ -134,10 +102,9 @@ export default defineComponent({
     })
 
     return {
-      photos, loading, progress, error, visibleDays, sentinel,
+      photos, loading, error, visibleDays, sentinel,
       viewerList, viewerIndex, openViewer, formatDay, onImgError,
-      rescan, root, rootMissing, fallbackFrom, rootLabel, pickerOpen, onSelectFolder,
-      thumbSrc, ensurePreview, ensureOriginal
+      rescan, thumbSrc, ensurePreview, ensureOriginal
     }
   }
 })
@@ -147,24 +114,11 @@ export default defineComponent({
 .photos-view { display: flex; flex-direction: column; height: 100%; }
 .photos-toolbar {
   display: flex; align-items: center; gap: 16px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--oc-role-outline-variant, #bfc8cc);
+  padding: 8px 16px; border-bottom: 1px solid var(--oc-role-outline-variant, #bfc8cc);
 }
 .photos-title { font-size: 1.1rem; font-weight: 600; margin: 0; }
-.photos-folder {
-  display: inline-flex; align-items: center; gap: 6px; max-width: 40%;
-  padding: 2px 8px; border: 1px solid var(--oc-role-outline-variant, #bfc8cc); border-radius: 6px;
-  background: none; color: var(--oc-role-on-surface-variant, #40484c); cursor: pointer; font-size: 0.8rem;
-}
-.photos-folder span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.photos-folder:hover { background: var(--oc-role-surface-container, #f6f8fa); }
 .photos-progress, .photos-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
-.photos-nav { margin-left: auto; font-size: 0.85rem; }
-.photos-banner {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 8px 16px; font-size: 0.85rem;
-  background: var(--oc-role-surface-container, #f6f8fa); color: var(--oc-role-on-surface-variant, #40484c);
-}
+.photos-nav { margin-left: auto; display: flex; gap: 16px; font-size: 0.85rem; }
 .photos-error { padding: 16px; color: var(--oc-role-error, #ba1a1a); }
 .photos-empty {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -179,8 +133,8 @@ export default defineComponent({
 }
 .photos-day-header span { color: var(--oc-role-on-surface-variant, #40484c); margin-left: 0.5em; }
 .photos-grid {
-  display: grid; gap: 2px;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  display: grid; gap: 3px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 .photos-cell {
   position: relative; aspect-ratio: 1; padding: 0; border: 0; cursor: pointer;

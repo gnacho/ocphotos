@@ -9,14 +9,10 @@ import '@opencloud-eu/extension-sdk/tailwind.css'
 import { RouteRecordRaw } from 'vue-router'
 import { computed } from 'vue'
 import { useGettext } from 'vue3-gettext'
-import { setConfiguredRoot } from './composables/usePhotoLibrary'
 
 export default defineWebApplication({
   setup(args) {
     const { $gettext } = useGettext()
-
-    // raíz por defecto, configurable en apps.yaml: ocphotos.config.rootPath
-    setConfiguredRoot((args as any)?.applicationConfig?.rootPath)
 
     const appInfo = {
       id: 'ocphotos',
@@ -46,6 +42,24 @@ export default defineWebApplication({
         meta: {
           authContext: 'user',
           title: $gettext('Memories')
+        }
+      },
+      {
+        path: '/map',
+        name: 'photos-map',
+        component: () => import('./views/MapView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Map')
+        }
+      },
+      {
+        path: '/favorites',
+        name: 'photos-favorites',
+        component: () => import('./views/FavoritesView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Favorites')
         }
       }
     ]
