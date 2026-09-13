@@ -7,9 +7,11 @@ expuesto en el mismo origen como `/ocphotos-api/`.
 
 ## Qué hace (Etapa 2, con backend)
 
-- **Timeline** por días (fecha **EXIF de captura**, no mtime) con headers sticky y
-  scroll infinito por paginación keyset; miniaturas generadas por el backend
-  (incluye **HEIC/HEIF**, que OpenCloud no decodifica).
+- **Timeline** por **mes y día** (fecha **EXIF de captura**, no mtime) con headers
+  sticky y scroll infinito por paginación keyset; miniaturas generadas por el
+  backend (incluye **HEIC/HEIF**, que OpenCloud no decodifica).
+- **Rewind**: scrubber de años para saltar a cualquier fecha (`/api/timeline/calendar`).
+- **Explore**: hub con buscador por fichero/cámara/ruta y accesos rápidos.
 - **Mapa**: marcadores de las fotos con GPS (`/api/geo`) sobre OpenStreetMap.
 - **Favoritos**: marcar/desmarcar desde el visor y listado propio.
 - **Recuerdos** ("Un día como hoy…") agrupados por año.
