@@ -1,56 +1,65 @@
 # Deployment: cloud.example.com
 
-ocphotos is served on the drive instance in two layers.
+ocphotos is a native OpenCloud web extension. It is installed on the drive
+instance (the OpenCloud container, the Proxmox node) and served by the OpenCloud web service; it uses the
+host session, so it needs no app tokens of its own.
 
-## 1. Static PWA
-
-The Vite build (`app/dist`) is served same-origin at
-`https://cloud.example.com/ocphotos/` by Nginx Proxy Manager (the vhost on the proxy host,
-the proxy container). Static files live at `/data/ocphotos` on that host.
-
-See `nginx-ocphotos.conf` for the `location` block. Because the PWA is served from
-the same origin as OpenCloud, its Graph/WebDAV calls need no CORS configuration.
-
-Build and publish:
+## Build
 
 ```bash
-cd app
-npm ci
-npm run build
-tar czf /tmp/ocphotos-dist.tgz -C dist .
-scp -P 2222 /tmp/ocphotos-dist.tgz root@<node4>:/tmp/
-# on node4: pct push 4020 /tmp/ocphotos-dist.tgz /tmp/ocphotos-dist.tgz
-# in the proxy container: rm -rf /data/ocphotos/* && tar xzf /tmp/ocphotos-dist.tgz -C /data/ocphotos
-#             chown -R www-data:www-data /data/ocphotos
-# then reload openresty (see nginx-ocphotos.conf)
+cd ocphotos
+pnpm install
+pnpm build        # emits dist/ (module federation: manifest.json + js/ + assets/)
+pnpm check:types
 ```
 
-## 2. OpenCloud app menu entry
+## Install
 
-To appear as a regular app in the OpenCloud app switcher, the instance runs the
-official `web-app-external-sites` app configured with ocphotos as an `embedded`
-site (an iframe pointing at the same-origin PWA).
-
-- App artifact: `external-sites-2.1.0.zip` from
-  https://github.com/opencloud-eu/web-extensions/releases (verify the sha256).
-- Installed at `/etc/opencloud/web/assets/apps/external-sites/` on the OpenCloud
-  host (the OpenCloud container).
-- Config in `/etc/opencloud/apps.yaml`:
+The web service loads extensions from `WEB_ASSET_APPS_PATH`
+(`/etc/opencloud/web/assets/apps`). Copy the built `dist/` into
+`/etc/opencloud/web/assets/apps/ocphotos/` and register the app in
+`/etc/opencloud/apps.yaml`:
 
 ```yaml
-external-sites:
-  config:
-    sites:
-      - name: ocphotos
-        url: https://cloud.example.com/ocphotos/
-        target: embedded
-        color: '#0ea5e9'
-        icon: images
-        priority: 40
+ocphotos:
+  config: {}
 ```
 
-- Restart OpenCloud after installing the app or changing the config: the app
-  registry (`external_apps` in `config.json`) is rebuilt at startup.
+OpenCloud rebuilds the `external_apps` list in `config.json` at startup, so a
+restart is required after installing or replacing the app:
 
-The iframe needs no CSP change: OpenCloud's `frame-src 'self'` already allows the
-same-origin URL, and the static `location` sends no `X-Frame-Options`.
+```bash
+rm -rf /etc/opencloud/web/assets/apps/ocphotos
+mkdir -p /etc/opencloud/web/assets/apps/ocphotos
+tar xzf /tmp/ocphotos-dist.tgz -C /etc/opencloud/web/assets/apps/ocphotos
+chown -R 1000:1000 /etc/opencloud/web/assets/apps/ocphotos
+systemctl restart opencloud
+curl -s http://127.0.0.1:9200/config.json | jq '.external_apps'
+```
+
+`external_apps` must list `ocphotos` with the current `remoteEntry-*.mjs` from
+`manifest.json`. Remove the old app directory before the restart: stale chunks
+break the module federation manifest. Backups go outside `assets/apps/`
+(e.g. `/root/ocphotos.bak-<date>`).
+
+## URL routing
+
+The extension is served under `/ocphotos` by the OpenCloud single-page app.
+There must be no Nginx Proxy Manager `location` for `/ocphotos`: NPM proxies
+everything to the OpenCloud web service, which resolves the app route. The
+earlier static PWA location was removed on 2026-09-13 (backup
+`vhost.conf.bak-native` on the proxy host, the proxy container); if the host is
+regenerated from the NPM panel, just do not re-add it.
+
+The app registers itself in the app switcher as `app.ocphotos.menuItem`.
+
+## Notes
+
+- Thumbnails and originals are fetched through the host session (Bearer token)
+  with the preview service (`usePreviewService().loadPreview`) and rendered as
+  blob URLs. A plain `<img src>` cannot carry the token, so raw WebDAV URLs do
+  not authenticate.
+- Route links must use paths, not names: the host prefixes app route names
+  (`photos-timeline` becomes `ocphotos-photos-timeline`).
+- The extension indexes `/Fotos` in the personal space over WebDAV
+  (`rootPath` in `src/views/TimelineView.vue`).
