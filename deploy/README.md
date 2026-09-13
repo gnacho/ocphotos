@@ -61,5 +61,15 @@ The app registers itself in the app switcher as `app.ocphotos.menuItem`.
   not authenticate.
 - Route links must use paths, not names: the host prefixes app route names
   (`photos-timeline` becomes `ocphotos-photos-timeline`).
-- The extension indexes `/Fotos` in the personal space over WebDAV
-  (`rootPath` in `src/views/TimelineView.vue`).
+- The extension indexes a folder in the personal space over WebDAV. The default
+  root is `/Fotos`; users can change it from the in-app folder picker (remembered
+  per browser in localStorage), or an admin can set the default in `apps.yaml`:
+
+  ```yaml
+  ocphotos:
+    config:
+      rootPath: /Fotos
+  ```
+
+  Restart OpenCloud after changing `apps.yaml`. A user's pick in the UI takes
+  precedence over the configured default.

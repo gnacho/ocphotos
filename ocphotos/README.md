@@ -9,8 +9,10 @@ sobre el skeleton oficial. Sin iframe, sin tokens propios: usa la **sesión del 
   miniaturas servidas por el propio OpenCloud (`?x=&y=&processor=thumbnail`).
 - **Visor** a pantalla completa con navegación por teclado, vídeo y descarga.
 - **Recuerdos** ("Un día como hoy…") agrupados por año.
-- Indexado por **WebDAV con la sesión del usuario** (PROPFIND recursivo desde
-  `/Fotos`, configurable en `rootPath` de `TimelineView.vue`).
+- Indexado por **WebDAV con la sesión del usuario** (PROPFIND recursivo desde una
+  carpeta raíz). La raíz por defecto es `/Fotos` y se cambia desde el **selector
+  de carpeta** de la propia app (se recuerda por navegador en localStorage) o con
+  `ocphotos.config.rootPath` en `apps.yaml`.
 - Caché de la lista en localStorage (6 h) + botón de rescan.
 - Registrada en el **conmutador de aplicaciones** (appMenuItem).
 
