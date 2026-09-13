@@ -8,6 +8,7 @@
         <oc-icon name="refresh" size="small" />
       </oc-button>
       <nav class="photos-nav">
+        <router-link to="/ocphotos/explore" v-text="$gettext('Explore')" />
         <router-link to="/ocphotos/memories" v-text="$gettext('Memories')" />
         <router-link to="/ocphotos/map" v-text="$gettext('Map')" />
         <router-link to="/ocphotos/favorites" v-text="$gettext('Favorites')" />
@@ -19,22 +20,45 @@
       <p v-text="$gettext('No photos yet')" />
     </div>
 
-    <div v-else class="photos-scroll">
-      <section v-for="day in visibleDays" :key="day.key" class="photos-day">
-        <h3 class="photos-day-header">{{ formatDay(day.date) }} <span>{{ day.photos.length }}</span></h3>
-        <div class="photos-grid">
-          <button
-            v-for="p in day.photos"
-            :key="p.id"
-            class="photos-cell"
-            @click="openViewer(day.photos, p)"
-          >
-            <img :src="thumbSrc(p)" :alt="p.name" loading="lazy" @error="onImgError" />
-            <span v-if="p.isVideo" class="photos-video-badge">▶</span>
-          </button>
-        </div>
-      </section>
-      <div ref="sentinel" class="photos-sentinel" />
+    <div v-else class="photos-body">
+      <div class="photos-scroll">
+        <section v-for="m in months" :key="m.key" class="photos-month">
+          <h2 class="photos-month-header">{{ m.label }}</h2>
+          <section v-for="day in m.days" :key="day.key" class="photos-day">
+            <h3 class="photos-day-header">{{ formatDay(day.date) }} <span>{{ day.photos.length }}</span></h3>
+            <div class="photos-grid">
+              <button
+                v-for="p in day.photos"
+                :key="p.id"
+                class="photos-cell"
+                @click="openViewer(day.photos, p)"
+              >
+                <img :src="thumbSrc(p)" :alt="p.name" loading="lazy" @error="onImgError" />
+                <span v-if="p.isVideo" class="photos-video-badge">▶</span>
+              </button>
+            </div>
+          </section>
+        </section>
+        <div ref="sentinel" class="photos-sentinel" />
+      </div>
+
+      <!-- Rewind: saltar a cualquier año -->
+      <aside v-if="years.length" class="rewind">
+        <button
+          class="rewind-item rewind-now"
+          :class="{ active: startAt === null }"
+          :title="$gettext('Now')"
+          @click="jumpTo(null)"
+        >•</button>
+        <button
+          v-for="y in years"
+          :key="y.year"
+          class="rewind-item"
+          :class="{ active: topYear === y.year }"
+          :title="$gettext('%{n} items', { n: y.count })"
+          @click="jumpToYear(y.year)"
+        >{{ y.year }}</button>
+      </aside>
     </div>
 
     <viewer-overlay
@@ -58,18 +82,22 @@ export default defineComponent({
   name: 'TimelineView',
   components: { ViewerOverlay },
   setup() {
-    const { photos, loading, error, days, exhausted, init, loadMore, rescan, previews, ensurePreview, ensureOriginal, openPreview } =
-      usePhotoLibrary()
+    const {
+      photos, loading, error, months, exhausted, startAt,
+      init, loadMore, jumpTo, fetchCalendar, rescan, previews, ensurePreview, ensureOriginal, openPreview
+    } = usePhotoLibrary()
 
     const sentinel = ref<HTMLElement | null>(null)
-    const visibleDays = computed(() => days.value)
+    const years = ref<{ year: number; count: number }[]>([])
+
+    const topYear = computed(() => (photos.value[0] ? new Date(photos.value[0].takenAt * 1000).getFullYear() : null))
 
     const thumbSrc = (p: Photo) => previews.value[`${p.id}|400`]
 
     watch(
-      visibleDays,
+      months,
       (list) => {
-        for (const day of list) for (const p of day.photos) void ensurePreview(p, 400)
+        for (const m of list) for (const day of m.days) for (const p of day.photos) void ensurePreview(p, 400)
       },
       { immediate: true }
     )
@@ -92,8 +120,19 @@ export default defineComponent({
       el.onerror = null
     }
 
+    const jumpToYear = (year: number) => {
+      // fin de ese año: el timeline arranca ahí y va hacia atrás
+      const ts = Math.floor(Date.UTC(year, 11, 31, 23, 59, 59) / 1000)
+      void jumpTo(ts)
+    }
+
     onMounted(async () => {
       await init()
+      try {
+        years.value = await fetchCalendar()
+      } catch {
+        /* sin scrubber si falla */
+      }
       const obs = new IntersectionObserver(
         (entries) => {
           if (entries[0].isIntersecting && !exhausted.value) void loadMore()
@@ -104,8 +143,8 @@ export default defineComponent({
     })
 
     return {
-      photos, loading, error, visibleDays, sentinel,
-      viewerList, viewerIndex, openViewer, formatDay, onImgError,
+      photos, loading, error, months, years, topYear, startAt, sentinel,
+      viewerList, viewerIndex, openViewer, formatDay, onImgError, jumpTo, jumpToYear,
       rescan, thumbSrc, ensurePreview, ensureOriginal
     }
   }
@@ -126,10 +165,15 @@ export default defineComponent({
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c);
 }
-.photos-empty p { margin: 0; }
+.photos-body { flex: 1; min-height: 0; display: flex; }
 .photos-scroll { flex: 1; overflow-y: auto; padding: 0 8px; }
+.photos-month-header {
+  position: sticky; top: 0; z-index: 2; margin: 0; padding: 10px 4px 6px;
+  font-size: 1rem; font-weight: 700; text-transform: capitalize;
+  background: var(--oc-role-surface, #fff);
+}
 .photos-day-header {
-  position: sticky; top: 0; z-index: 1; margin: 0; padding: 8px 0;
+  position: sticky; top: 36px; z-index: 1; margin: 0; padding: 6px 0;
   font-size: 0.8rem; font-weight: 500; text-transform: capitalize;
   background: var(--oc-role-surface, #fff);
 }
@@ -148,4 +192,17 @@ export default defineComponent({
   background: rgba(0, 0, 0, 0.55); border-radius: 4px; padding: 1px 6px;
 }
 .photos-sentinel { height: 1px; }
+
+/* Rewind */
+.rewind {
+  flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 0; overflow-y: auto; border-left: 1px solid var(--oc-role-outline-variant, #bfc8cc);
+}
+.rewind-item {
+  border: 0; background: none; cursor: pointer; font-size: 0.72rem; font-weight: 600;
+  color: var(--oc-role-on-surface-variant, #40484c); padding: 2px 6px; border-radius: 10px;
+}
+.rewind-item:hover { background: var(--oc-role-surface-container, #f6f8fa); }
+.rewind-item.active { background: var(--oc-role-primary, #00677f); color: #fff; }
+.rewind-now { font-size: 1rem; }
 </style>

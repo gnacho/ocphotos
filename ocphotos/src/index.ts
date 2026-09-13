@@ -61,6 +61,15 @@ export default defineWebApplication({
           authContext: 'user',
           title: $gettext('Favorites')
         }
+      },
+      {
+        path: '/explore',
+        name: 'photos-explore',
+        component: () => import('./views/ExploreView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Explore')
+        }
       }
     ]
 

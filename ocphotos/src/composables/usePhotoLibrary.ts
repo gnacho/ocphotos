@@ -80,6 +80,7 @@ const state = {
   loading: ref(false),
   error: ref<string | null>(null),
   exhausted: ref(false),
+  startAt: ref<number | null>(null), // null = desde ahora (Rewind)
   initialized: false
 }
 
@@ -119,6 +120,10 @@ export function usePhotoLibrary() {
       if (!reset && last) {
         q.set('before_taken', String(last.takenAt))
         q.set('before_id', String(last.id))
+      } else if (reset && state.startAt.value) {
+        // Rewind: empezar en (o antes de) la fecha elegida
+        q.set('before_taken', String(state.startAt.value + 1))
+        q.set('before_id', String(2 ** 62 - 1))
       }
       const res = await api(`/api/assets?${q.toString()}`)
       const json = (await res.json()) as { assets?: ApiAsset[] }
@@ -150,6 +155,19 @@ export function usePhotoLibrary() {
     await loadPage(true)
   }
 
+  /** Rewind: salta a una fecha (segundos) y recarga el timeline desde ahí. */
+  const jumpTo = async (ts: number | null) => {
+    state.startAt.value = ts
+    state.exhausted.value = false
+    await loadPage(true)
+  }
+
+  const fetchCalendar = async (): Promise<{ year: number; count: number }[]> => {
+    const res = await api('/api/timeline/calendar')
+    const json = (await res.json()) as { years?: { year: number; count: number }[] }
+    return json.years ?? []
+  }
+
   const days = computed<DayBucket[]>(() => {
     const map = new Map<string, Photo[]>()
     for (const p of state.photos.value) {
@@ -161,6 +179,23 @@ export function usePhotoLibrary() {
     return Array.from(map.entries())
       .sort(([a], [b]) => (a < b ? 1 : -1))
       .map(([key, photos]) => ({ key, date: new Date(photos[0].takenAt * 1000), photos }))
+  })
+
+  /** Timeline agrupado por mes (para las cabeceras mes/año de Memories). */
+  const months = computed(() => {
+    const byMonth = new Map<string, DayBucket[]>()
+    for (const d of days.value) {
+      const key = d.key.slice(0, 7)
+      if (!byMonth.has(key)) byMonth.set(key, [])
+      byMonth.get(key)!.push(d)
+    }
+    return Array.from(byMonth.entries())
+      .sort(([a], [b]) => (a < b ? 1 : -1))
+      .map(([key, list]) => ({
+        key,
+        label: new Intl.DateTimeFormat(navigator.language || 'en', { month: 'long', year: 'numeric' }).format(list[0].date),
+        days: list
+      }))
   })
 
   /** Miniatura del backend (decodifica HEIC/HEIF). Devuelve un blob URL. */
@@ -240,6 +275,12 @@ export function usePhotoLibrary() {
     return true
   }
 
+  const searchAssets = async (q: string): Promise<Photo[]> => {
+    const res = await api(`/api/assets?limit=500&q=${encodeURIComponent(q)}`)
+    const json = (await res.json()) as { assets?: ApiAsset[] }
+    return (json.assets ?? []).map(toPhoto)
+  }
+
   const fetchFavorites = async (): Promise<Photo[]> => {
     const res = await api('/api/assets?favorites=1&limit=2000')
     const json = (await res.json()) as { assets?: ApiAsset[] }
@@ -251,9 +292,13 @@ export function usePhotoLibrary() {
     loading: state.loading,
     error: state.error,
     exhausted: state.exhausted,
+    startAt: state.startAt,
     days,
+    months,
     init,
     loadMore,
+    jumpTo,
+    fetchCalendar,
     rescan,
     ensurePreview,
     ensureOriginal,
@@ -261,6 +306,7 @@ export function usePhotoLibrary() {
     fetchGeo,
     fetchOnThisDay,
     fetchFavorites,
+    searchAssets,
     canNativePreview,
     nativePreviewUrl,
     openPreview,

@@ -310,6 +310,32 @@ func (s *Store) GeoAssets(ctx context.Context, limit int) ([]Asset, error) {
 	return out, rows.Err()
 }
 
+// YearCount: fotos por año de captura (para el scrubber "Rewind").
+type YearCount struct {
+	Year  int   `json:"year"`
+	Count int64 `json:"count"`
+}
+
+// Calendar devuelve los años con fotos y su recuento, descendente.
+func (s *Store) Calendar(ctx context.Context) ([]YearCount, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT CAST(strftime('%Y', taken_at, 'unixepoch') AS INT) AS y, count(*)
+		 FROM assets WHERE deleted_at IS NULL GROUP BY y ORDER BY y DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []YearCount{}
+	for rows.Next() {
+		var yc YearCount
+		if err := rows.Scan(&yc.Year, &yc.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, yc)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) Stats(ctx context.Context) (map[string]any, error) {
 	var total, favs, geo, exifPending, videos int64
 	row := s.db.QueryRowContext(ctx, `SELECT

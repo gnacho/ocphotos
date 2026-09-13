@@ -52,6 +52,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/thumb", s.thumbByPath)
 	mux.HandleFunc("GET /api/assets/{id}/original", s.original)
 	mux.HandleFunc("GET /api/memories/on-this-day", s.onThisDay)
+	mux.HandleFunc("GET /api/timeline/calendar", s.calendar)
 	mux.HandleFunc("GET /api/geo", s.geo)
 	mux.HandleFunc("POST /api/admin/rescan", s.rescan)
 	return s.withAuth(withCORS(mux))
@@ -287,6 +288,15 @@ func (s *Server) onThisDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"assets": list})
+}
+
+func (s *Server) calendar(w http.ResponseWriter, r *http.Request) {
+	years, err := s.st.Calendar(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"years": years})
 }
 
 func (s *Server) geo(w http.ResponseWriter, r *http.Request) {
