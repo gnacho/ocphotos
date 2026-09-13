@@ -94,7 +94,7 @@ export default defineComponent({
     const { $gettext } = useGettext()
     const {
       photos, loading, error, months, exhausted, startAt,
-      init, loadMore, jumpTo, fetchCalendar, fetchOnThisDay, rescan, previews, ensurePreview, ensureOriginal, openPreview
+      init, loadMore, jumpTo, fetchCalendar, fetchOnThisDay, rescan, previews, ensurePreview, ensureOriginal, openPreview, startWatching
     } = usePhotoLibrary()
 
     const sentinel = ref<HTMLElement | null>(null)
@@ -155,6 +155,7 @@ export default defineComponent({
 
     onMounted(async () => {
       await init()
+      startWatching()
       try {
         years.value = await fetchCalendar()
       } catch {

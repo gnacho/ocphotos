@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/opencloud-memories/photos-service/internal/api"
@@ -41,7 +42,7 @@ func getenv(k, def string) string {
 }
 
 func loadConfig() config {
-	d, _ := time.ParseDuration(getenv("SCAN_EVERY", "30m"))
+	d, _ := time.ParseDuration(getenv("SCAN_EVERY", "5m"))
 	return config{
 		listenAddr: getenv("LISTEN_ADDR", ":9210"),
 		ocBaseURL:  getenv("OC_BASE_URL", "https://localhost:9200"),
@@ -122,17 +123,25 @@ func main() {
 	exifWorker := exif.NewWorker(dc, st, log)
 	apiSrv := api.New(st, thumbs, dc, scanner, webdavURL, cfg.scanRoot, cfg.ocBaseURL, meID, cfg.token, log)
 
-	// scan + EXIF bajo demanda y programados
-	go func() {
-		run := func() {
-			sctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
-			if err := scanner.ScanSpace(sctx, webdavURL, cfg.scanRoot); err != nil {
-				log.Error("scan", "err", err)
-			}
-			exifWorker.Run(sctx)
-			cancel()
+	// scan + EXIF bajo demanda y programados. El rescan bajo demanda (lo pide la
+	// extensión al abrir/enfocar para recoger fotos recién subidas) va con throttle
+	// para no encadenar PROPFINDs completos.
+	var scanMu sync.Mutex
+	lastScan := time.Time{}
+	runScan := func(reason string) {
+		sctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
+		defer cancel()
+		log.Info("scan", "motivo", reason)
+		if err := scanner.ScanSpace(sctx, webdavURL, cfg.scanRoot); err != nil {
+			log.Error("scan", "err", err)
 		}
-		run() // scan inicial bloqueante en goroutine
+		exifWorker.Run(sctx)
+		scanMu.Lock()
+		lastScan = time.Now()
+		scanMu.Unlock()
+	}
+	go func() {
+		runScan("inicial")
 		ticker := time.NewTicker(cfg.scanEvery)
 		defer ticker.Stop()
 		for {
@@ -140,10 +149,15 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				run()
+				runScan("programado")
 			case <-apiSrv.RescanRequests():
-				log.Info("rescan bajo demanda")
-				run()
+				scanMu.Lock()
+				recent := time.Since(lastScan) < 20*time.Second
+				scanMu.Unlock()
+				if recent {
+					continue
+				}
+				runScan("bajo demanda")
 			}
 		}
 	}()

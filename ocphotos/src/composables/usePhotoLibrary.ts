@@ -162,6 +162,45 @@ export function usePhotoLibrary() {
     await loadPage(true)
   }
 
+  // --- sincronización automática: recoge fotos subidas a OpenCloud ---
+  let lastTotal: number | null = null
+  let watching = false
+
+  /** Pide un rescan al backend y recarga el timeline si cambió el número de fotos. */
+  const syncNow = async (triggerScan = true) => {
+    if (state.loading.value) return
+    try {
+      if (triggerScan) await api('/api/admin/rescan', { method: 'POST' })
+      const res = await api('/api/stats')
+      const st = (await res.json()) as { assets?: number }
+      const total = st.assets ?? 0
+      if (lastTotal === null) {
+        lastTotal = total
+        return
+      }
+      if (total !== lastTotal) {
+        lastTotal = total
+        state.exhausted.value = false
+        await loadPage(true)
+      }
+    } catch {
+      /* sin conexión con el servicio: se reintenta en el siguiente tick */
+    }
+  }
+
+  /** Arranca el watcher: al abrir/enfocar y cada 30 s mientras la pestaña está visible. */
+  const startWatching = () => {
+    if (watching) return
+    watching = true
+    void syncNow(true)
+    window.setInterval(() => {
+      if (document.visibilityState === 'visible') void syncNow(true)
+    }, 30000)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') void syncNow(true)
+    })
+  }
+
   const fetchCalendar = async (): Promise<{ year: number; count: number }[]> => {
     const res = await api('/api/timeline/calendar')
     const json = (await res.json()) as { years?: { year: number; count: number }[] }
@@ -299,6 +338,8 @@ export function usePhotoLibrary() {
     loadMore,
     jumpTo,
     fetchCalendar,
+    startWatching,
+    syncNow,
     rescan,
     ensurePreview,
     ensureOriginal,
