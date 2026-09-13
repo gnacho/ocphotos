@@ -202,3 +202,32 @@ Se ha construido el primer esfuerzo funcional de "Memories para OpenCloud":
 - **Cliente OpenCloud real** en el navegador (`src/lib/opencloud.ts`): descubrimiento de espacios vía `GET /graph/v1.0/me/drives`, PROPFIND recursivo sobre `/Fotos`, auth con app-token. Funciona contra una instancia real con CORS habilitado; si no, la app arranca con 1.343 fotos demo generadas (seed determinista).
 - **`server-go/`**: esqueleto del photos-service — cliente DAV completo en Go, scanner incremental por etag con soft-delete, esquema Postgres (assets, day_buckets materializado, persons/faces, álbumes), main con config por entorno y TODOs marcados (store pgx, API REST, workers River, OIDC).
 - Decisiones aplicadas del análisis: sin código PHP portado, EXIF por Range request, sidecar XMP planificado para sobrevivir reubicaciones, ML diferido a microservicio Python (fase 3).
+
+---
+
+## 11. v1.0 producción: photos-service Go + SQLite (2026-09-13)
+
+Decisión de BBDD revisada: **SQLite** (modernc.org/sqlite, Go puro, binario estático sin CGO) en vez de Postgres — para 70k fotos y uso personal sobra y elimina un contenedor. Implementado y verificado:
+
+- `internal/dav`: Graph `/me/drives` + PROPFIND + Range GET + descarga. ✅ e2e
+- `internal/index`: scanner incremental por etag, soft-delete. ✅ e2e contra mock OpenCloud
+- `internal/store`: SQLite (WAL), paginación por cursor, favoritos, on-this-day, geo. ✅ tests
+- `internal/exif`: worker con Range de 256 KB (sin descargar originales). ✅
+- `internal/thumb`: thumbnails propios JPEG/PNG/WebP, caché por etag. ✅ e2e
+- `internal/api`: REST completa + auth Bearer propia + CORS. ✅ e2e
+- PWA: modo servicio con scroll infinito (70k-ready), favoritos persistidos, auto-detección del servicio en mismo origen.
+- Empaquetado: `Dockerfile` multi-stage (frontend→Go→alpine, un solo contenedor), `docker-compose.yml`, `.env.example`. Volumen `/data` = memories.db + thumbs. Backup = copiar el .db.
+- Auth: app-token de OpenCloud solo en servidor; la PWA usa MEMORIES_TOKEN propio.
+- Pendiente: álbumes API (v0.2), ML fase 3, vídeo/HEIC, sidecars XMP.
+
+### 11.1 v1.1 — theming claro/oscuro (estilo OpenCloud)
+Sistema de variables CSS semánticas (--ocm-*) con toggle Sol/Luna, default = prefers-color-scheme (light-first como la UI de OpenCloud), sin flash inicial (script inline), persistencia en localStorage, tiles del mapa CARTO light/dark sincronizados. El visor de fotos permanece oscuro en ambos temas (convención de visores). Integración nativa como extensión web OpenCloud (Vue 3 + extension-sdk) sigue en roadmap; la PWA standalone ya comparte lenguaje visual (superficies, bordes, tipografía del sistema).
+
+### 11.2 v1.2 — modo embebido (app externa en el app-switcher)
+La PWA detecta `window.self !== window.top` y oculta su chrome propio (topbar + sidebar), mostrando una barra compacta (navegación, búsqueda, tema, ajustes) para evitar el doble encabezado cuando se registra como app externa de OpenCloud vía iframe. Verificado con shell simulado. La integración nativa real (extensión Vue con sesión del host, sin iframe) sigue siendo el port pendiente al extension-sdk.
+
+---
+
+## 12. Etapa 1 nativa: ocphotos (extensión Vue 3 para OpenCloud, 2026-09-13)
+
+Siguiendo el plan de dos etapas, se ha construido **ocphotos**, extensión web nativa sobre el skeleton oficial (`@opencloud-eu/web-pkg` 7.4): timeline por días con scroll infinito, visor fullscreen (teclado, vídeo, descarga), Recuerdos ("Un día como hoy…"), miniaturas servidas por OpenCloud con la sesión del host (sin app-tokens), registro en el app-switcher. Compila (`pnpm build` → module federation `dist/`) y pasa `vue-tsc` limpio. Limitaciones de etapa: fecha por mtime (EXIF llega con el backend Go de la Etapa 2, ya construido en app/server-go), sin GPS/favoritos persistentes, escaneo WebDAV en navegador con caché localStorage.
