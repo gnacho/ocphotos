@@ -1,57 +1,100 @@
 # ocphotos
 
-An Immich/Memories-style photo experience for [OpenCloud](https://opencloud.eu): timeline,
-memories, places, faces and albums, with OpenCloud as the source of truth for the files.
+A Memories-style photo experience for [OpenCloud](https://opencloud.eu): a date timeline,
+"on this day", places, albums, tags, folders, a map and duplicates, with OpenCloud as the
+source of truth for the files.
 
-This repository holds the feasibility study, a native OpenCloud web extension (stage 1) and
-the standalone photo service prototype (stage 2).
+It is a **native OpenCloud web extension** (Vue 3 + extension-sdk, session-based, no iframe)
+plus a **Go photo service** that keeps the metadata index (EXIF, GPS, tags, albums, hashes)
+and generates thumbnails, including HEIC.
 
-## Why not a PHP app
+## Screenshots
 
-OpenCloud has no server-side PHP app runtime and no Nextcloud-style relational filecache,
-so porting Memories is not an option. The working architecture is a standalone photo service
-that talks to OpenCloud over WebDAV/Graph/OIDC, which is the same shape Immich already uses.
+| Timeline (justified, month/day headers, Rewind) | On this day |
+|---|---|
+| ![Timeline](docs/screenshots/timeline.webp) | ![On this day](docs/screenshots/on-this-day.webp) |
+
+| Explore (search hub) | Albums |
+|---|---|
+| ![Explore](docs/screenshots/explore.webp) | ![Albums](docs/screenshots/albums.webp) |
+
+| Places (reverse geocoded) | Tags |
+|---|---|
+| ![Places](docs/screenshots/places.webp) | ![Tags](docs/screenshots/tags.webp) |
+
+| Folders (OpenCloud tree) | Map (thumbnail markers) |
+|---|---|
+| ![Folders](docs/screenshots/folders.webp) | ![Map](docs/screenshots/map.webp) |
+
+| Duplicates (perceptual hash) | Archive |
+|---|---|
+| ![Duplicates](docs/screenshots/duplicates.webp) | ![Archive](docs/screenshots/archive.webp) |
+
+| Favorites | Viewer |
+|---|---|
+| ![Favorites](docs/screenshots/favorites.webp) | ![Viewer](docs/screenshots/viewer.webp) |
+
+## Features
+
+- **Timeline** grouped by month and day, with EXIF capture dates, a justified layout
+  (fixed-height rows, widths by aspect ratio), infinite scroll and **Rewind** (year/month
+  scrubber to jump to any date).
+- **On this day**: highlights strip with "N years ago" cards; falls back to the same month of
+  previous years, then to the oldest photos, so it is never empty.
+- **Explore**: hub with metadata search (file, camera, path) and quick links.
+- **Albums**: create, rename, delete, add/remove photos (from the viewer or the grid).
+- **Places**: GPS photos clustered by area (~1 km) with **reverse geocoding** (Nominatim,
+  cached in SQLite).
+- **Tags**: manual tags, added from the viewer; tag list with counts.
+- **Folders**: browse the real OpenCloud folder tree (derived from the index) with breadcrumbs.
+- **Map**: photo **thumbnail markers** with count badges, grouped by place; click opens the photos.
+- **Duplicates**: perceptual hashes (dHash) to find near-identical photos.
+- **Archive**: hide photos from the timeline and keep them in their own view.
+- **Favorites**, **auto-sync** (new photos show up on their own) and **HEIC/HEIF** support
+  (pure-Go decoder in the service).
+- **Native navigation**: the sections live in OpenCloud's left sidebar (`navItems`), and the
+  UI is translated to Spanish (`l10n/translations.json`, follows the host language).
+
+## Architecture
+
+```
+OpenCloud (source of truth: files in the personal space)
+   |  WebDAV + Graph + OIDC session
+   v
+photos-service (Go, SQLite)  ──  index (EXIF, GPS, tags, albums, pHash), thumbnails, REST API
+   ^  /ocphotos-api/ (same origin, Nginx Proxy Manager)
+   |
+ocphotos extension (Vue 3)  ──  timeline, on this day, explore, albums, places, tags,
+                                folders, map, duplicates, archive, favorites, viewer
+```
+
+The extension never stores credentials: it calls the service with the host session bearer,
+and the service validates it against OpenCloud's Graph `/me` (single-tenant: only its own user).
 
 ## Layout
 
 | Path | What it is |
 |---|---|
 | `plan.md` | Short plan for the feasibility analysis |
-| `analisis-fotos-opencloud.md` | Full feasibility study (Spanish) |
-| `analisis-fotos-opencloud.docx` | Same study as a document export |
-| `ocphotos/` | Native OpenCloud web extension (Vue 3 + extension-sdk): timeline, viewer, memories |
-| `app/` | Standalone PWA prototype: React 19 + TypeScript + Vite + Tailwind + shadcn/ui |
-| `app/server-go/` | Go photo service: WebDAV/Graph client, incremental index, EXIF, thumbnails, SQLite, REST API |
+| `analisis-fotos-opencloud.md` / `.docx` | Full feasibility study (Spanish) |
+| `ocphotos/` | Native OpenCloud web extension (Vue 3 + extension-sdk) |
+| `app/` | Standalone PWA prototype (React 19 + Vite + Tailwind + shadcn/ui) |
+| `app/server-go/` | Go photo service: DAV/Graph client, index, EXIF, thumbnails, pHash, geocoding, REST API |
 | `deploy/` | Deployment notes for cloud.example.com |
-
-## Status
-
-Stage 1 (native extension) is built and type-checks clean. It indexes the personal space over
-WebDAV using the host session, so it needs no app tokens, and registers itself in the app
-switcher. Dates come from file mtime; EXIF, GPS and persistent favourites/albums belong to
-stage 2.
-
-The standalone service in `app/server-go/` implements the backend (incremental index, EXIF via
-range reads, own thumbnails, SQLite, REST API with its own bearer token). The PWA consumes it
-and also runs standalone against demo data.
 
 ## Development
 
-Native extension:
-
 ```bash
+# native extension
 cd ocphotos
 pnpm install
 pnpm build        # pnpm build:w to watch
 pnpm check:types
-```
 
-Standalone PWA and service:
-
-```bash
-cd app
-npm install
-npm run dev
+# Go service
+cd app/server-go
+go test ./...
+go build ./cmd/photos-service
 ```
 
 ## License
