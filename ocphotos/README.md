@@ -13,8 +13,12 @@ expuesto en el mismo origen como `/ocphotos-api/`.
 - **Mapa**: marcadores de las fotos con GPS (`/api/geo`) sobre OpenStreetMap.
 - **Favoritos**: marcar/desmarcar desde el visor y listado propio.
 - **Recuerdos** ("Un día como hoy…") agrupados por año.
-- **Visor** a pantalla completa (preview de 2048), navegación por teclado, vídeo,
-  favorito, descarga y datos de captura (fecha · cámara).
+- **Visor**: para los formatos que cubre la app nativa de OpenCloud
+  (jpg/png/gif/tiff/bmp/webp/svg y vídeo) se **delega en su visor nativo**
+  (`/preview/...`, con zoom y controles). HEIC/HEIF y RAW, que el nativo no
+  soporta, usan el visor propio (preview del backend a 2048, favorito, descarga y
+  datos de captura). Nota: la navegación siguiente/anterior del nativo es por
+  carpeta, no por el timeline.
 - Registrada en el **conmutador de aplicaciones** (appMenuItem).
 
 Pendiente de la Etapa 3: caras/CLIP (microservicio ML), álbumes, posters de vídeo.
