@@ -111,7 +111,7 @@ func main() {
 
 	scanner := index.NewScanner(dc, st, log)
 	exifWorker := exif.NewWorker(dc, st, log)
-	apiSrv := api.New(st, thumbs, dc, scanner, webdavURL, cfg.scanRoot, cfg.token, log)
+	apiSrv := api.New(st, thumbs, dc, scanner, webdavURL, cfg.scanRoot, cfg.ocBaseURL, cfg.token, log)
 
 	// scan + EXIF bajo demanda y programados
 	go func() {

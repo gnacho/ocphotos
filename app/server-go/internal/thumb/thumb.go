@@ -1,6 +1,8 @@
-// Package thumb — generación y caché en disco de miniaturas JPEG/PNG/WebP(decodifica) .
-// Formatos sin decodificador en Go puro (HEIC, RAW) devuelven ErrUnsupported:
-// la API sirve entonces el original o un placeholder.
+// Package thumb — generación y caché en disco de miniaturas.
+// Decodifica JPEG/PNG/GIF/WebP y HEIC/HEIF (decodificador HEVC en Go puro,
+// sin CGo ni libvips: gen2brain/h265 registra el formato en image.Decode).
+// Formatos sin decodificador (RAW) devuelven ErrUnsupported: la API sirve
+// entonces el original o un placeholder.
 package thumb
 
 import (
@@ -18,6 +20,7 @@ import (
 	"path/filepath"
 
 	"github.com/opencloud-memories/photos-service/internal/dav"
+	_ "github.com/gen2brain/h265/heic" // registra image.Decode para HEIC/HEIF
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
 )

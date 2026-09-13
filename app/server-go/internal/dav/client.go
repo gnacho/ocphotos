@@ -58,6 +58,24 @@ func (c *Client) FileURL(href string) string {
 	return c.base + href
 }
 
+// SpaceFileURL construye la URL interna de un fichero a partir del webDavUrl del
+// espacio y de su ruta relativa ("/Fotos/IMG.heic"), usando la base configurada
+// (permite que el servicio use 127.0.0.1 en vez de la URL pública).
+func (c *Client) SpaceFileURL(webdavURL, relPath string) string {
+	u, err := url.Parse(webdavURL)
+	if err != nil || u.Path == "" {
+		return c.base + relPath
+	}
+	segs := strings.Split(strings.Trim(relPath, "/"), "/")
+	esc := make([]string, 0, len(segs))
+	for _, s := range segs {
+		if s != "" {
+			esc = append(esc, url.PathEscape(s))
+		}
+	}
+	return c.base + strings.TrimRight(u.Path, "/") + "/" + strings.Join(esc, "/")
+}
+
 type Drive struct {
 	ID        string
 	Name      string

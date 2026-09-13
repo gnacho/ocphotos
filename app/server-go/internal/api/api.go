@@ -4,11 +4,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/opencloud-memories/photos-service/internal/dav"
@@ -18,21 +20,22 @@ import (
 )
 
 type Server struct {
-	st      *store.Store
-	thumbs  *thumb.Service
-	dav     *dav.Client
-	scanner *index.Scanner
+	st        *store.Store
+	thumbs    *thumb.Service
+	dav       *dav.Client
+	scanner   *index.Scanner
 	webdavURL string
 	scanRoot  string
-	token   string
-	log     *slog.Logger
-	rescanCh chan struct{}
+	ocBaseURL string
+	token     string
+	log       *slog.Logger
+	rescanCh  chan struct{}
 }
 
-func New(st *store.Store, th *thumb.Service, dc *dav.Client, sc *index.Scanner, webdavURL, scanRoot, token string, log *slog.Logger) *Server {
+func New(st *store.Store, th *thumb.Service, dc *dav.Client, sc *index.Scanner, webdavURL, scanRoot, ocBaseURL, token string, log *slog.Logger) *Server {
 	return &Server{
 		st: st, thumbs: th, dav: dc, scanner: sc,
-		webdavURL: webdavURL, scanRoot: scanRoot, token: token, log: log,
+		webdavURL: webdavURL, scanRoot: scanRoot, ocBaseURL: ocBaseURL, token: token, log: log,
 		rescanCh: make(chan struct{}, 1),
 	}
 }
@@ -45,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/assets/{id}", s.asset)
 	mux.HandleFunc("POST /api/assets/{id}/favorite", s.favorite)
 	mux.HandleFunc("GET /api/assets/{id}/thumb", s.thumbHandler)
+	mux.HandleFunc("GET /api/thumb", s.thumbByPath)
 	mux.HandleFunc("GET /api/assets/{id}/original", s.original)
 	mux.HandleFunc("GET /api/memories/on-this-day", s.onThisDay)
 	mux.HandleFunc("GET /api/geo", s.geo)
@@ -54,17 +58,75 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.token != "" && r.URL.Path != "/healthz" {
-			if r.Header.Get("Authorization") != "Bearer "+s.token {
-				// permite ?token= para <img> tags
-				if r.URL.Query().Get("token") != s.token {
-					http.Error(w, "unauthorized", http.StatusUnauthorized)
-					return
-				}
-			}
+		if r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
 		}
-		next.ServeHTTP(w, r)
+		// 1) token propio del servicio (admin/API)
+		if s.token != "" && (r.Header.Get("Authorization") == "Bearer "+s.token || r.URL.Query().Get("token") == s.token) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// 2) sesión de OpenCloud (la usa la extensión web)
+		if s.validOpenCloudSession(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// 3) legacy: sin token ni base configurados (solo LAN/VPN)
+		if s.token == "" && s.ocBaseURL == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
+}
+
+// validOpenCloudSession valida el Bearer de la sesión web contra Graph /me.
+func (s *Server) validOpenCloudSession(r *http.Request) bool {
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") || s.ocBaseURL == "" {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(s.ocBaseURL, "/")+"/graph/v1.0/me", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", auth)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp.StatusCode == http.StatusOK
+}
+
+// thumbByPath genera una miniatura a partir de la ruta del fichero (sin índice),
+// de modo que la extensión puede pedir miniaturas de HEIC que OpenCloud no sabe
+// previsualizar. path = ruta dentro del espacio ("/Fotos/IMG.heic").
+func (s *Server) thumbByPath(w http.ResponseWriter, r *http.Request) {
+	p := r.URL.Query().Get("path")
+	if p == "" {
+		http.Error(w, "path required", http.StatusBadRequest)
+		return
+	}
+	maxSize := 400
+	if v := r.URL.Query().Get("w"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 64 && n <= 2048 {
+			maxSize = n
+		}
+	}
+	href := s.dav.SpaceFileURL(s.webdavURL, p)
+	file, err := s.thumbs.Get(r.Context(), href, r.URL.Query().Get("etag"), maxSize)
+	if err != nil {
+		s.log.Warn("thumb by path", "path", p, "err", err)
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=2592000, immutable")
+	http.ServeFile(w, r, file)
 }
 
 func withCORS(next http.Handler) http.Handler {

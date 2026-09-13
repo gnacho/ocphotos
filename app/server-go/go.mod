@@ -1,8 +1,9 @@
 module github.com/opencloud-memories/photos-service
 
-go 1.24
+go 1.26.4
 
 require (
+	github.com/gen2brain/h265 v0.2.2
 	github.com/rwcarlsen/goexif v0.0.0-20190401152319-9e8de2bddbd4
 	golang.org/x/image v0.30.0
 	modernc.org/sqlite v1.38.0
