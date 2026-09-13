@@ -26,6 +26,7 @@ export interface Photo {
   lon?: number
   size: number
   favorite: boolean
+  archived: boolean
 }
 
 export interface DayBucket {
@@ -66,6 +67,17 @@ export interface FolderListing {
   assets: Photo[]
 }
 
+export interface CalendarMonth {
+  month: number
+  count: number
+}
+
+export interface CalendarYear {
+  year: number
+  count: number
+  months: CalendarMonth[]
+}
+
 interface ApiAsset {
   id: number
   path: string
@@ -84,6 +96,7 @@ interface ApiAsset {
   lon?: number
   size: number
   favorite: boolean
+  archived?: boolean
 }
 
 const toPhoto = (a: ApiAsset): Photo => ({
@@ -104,7 +117,8 @@ const toPhoto = (a: ApiAsset): Photo => ({
   lat: a.lat,
   lon: a.lon,
   size: a.size,
-  favorite: a.favorite
+  favorite: a.favorite,
+  archived: !!a.archived
 })
 
 const state = {
@@ -224,10 +238,30 @@ export function usePhotoLibrary() {
     })
   }
 
-  const fetchCalendar = async (): Promise<{ year: number; count: number }[]> => {
+  const fetchCalendar = async (): Promise<CalendarYear[]> => {
     const res = await api('/api/timeline/calendar')
-    const json = (await res.json()) as { years?: { year: number; count: number }[] }
+    const json = (await res.json()) as { years?: CalendarYear[] }
     return json.years ?? []
+  }
+
+  const setArchived = async (id: number, archived: boolean): Promise<void> => {
+    await api(`/api/assets/${id}/archive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived })
+    })
+  }
+
+  const fetchArchived = async (): Promise<Photo[]> => {
+    const res = await api('/api/assets?archived=1&limit=2000')
+    const json = (await res.json()) as { assets?: ApiAsset[] }
+    return (json.assets ?? []).map(toPhoto)
+  }
+
+  const fetchDuplicates = async (): Promise<{ groups: Photo[][]; pending: number }> => {
+    const res = await api('/api/duplicates')
+    const json = (await res.json()) as { groups?: ApiAsset[][]; pending?: number }
+    return { groups: (json.groups ?? []).map((g) => g.map(toPhoto)), pending: json.pending ?? 0 }
   }
 
   const days = computed<DayBucket[]>(() => {
@@ -469,6 +503,9 @@ export function usePhotoLibrary() {
     addTag,
     removeTag,
     fetchFolder,
+    setArchived,
+    fetchArchived,
+    fetchDuplicates,
     searchAssets,
     previews
   }

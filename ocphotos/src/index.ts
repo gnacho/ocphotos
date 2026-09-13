@@ -74,6 +74,24 @@ export default defineWebApplication({
         }
       },
       {
+        path: '/archive',
+        name: 'photos-archive',
+        component: () => import('./views/ArchiveView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Archive')
+        }
+      },
+      {
+        path: '/duplicates',
+        name: 'photos-duplicates',
+        component: () => import('./views/DuplicatesView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Duplicates')
+        }
+      },
+      {
         path: '/tags',
         name: 'photos-tags',
         component: () => import('./views/TagsView.vue'),
@@ -148,6 +166,18 @@ export default defineWebApplication({
         icon: 'price-tag-3',
         route: { path: `/${appInfo.id}/tags` },
         priority: 42
+      },
+      {
+        name: $gettext('Duplicates'),
+        icon: 'file-copy-2',
+        route: { path: `/${appInfo.id}/duplicates` },
+        priority: 43
+      },
+      {
+        name: $gettext('Archive'),
+        icon: 'archive-2',
+        route: { path: `/${appInfo.id}/archive` },
+        priority: 47
       },
       {
         name: $gettext('Folders'),

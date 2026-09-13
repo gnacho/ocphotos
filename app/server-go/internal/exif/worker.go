@@ -5,12 +5,18 @@ package exif
 import (
 	"bytes"
 	"context"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"log/slog"
 	"strconv"
 
+	_ "github.com/gen2brain/h265/heic"
 	"github.com/opencloud-memories/photos-service/internal/dav"
 	"github.com/opencloud-memories/photos-service/internal/store"
 	"github.com/rwcarlsen/goexif/exif"
+	_ "golang.org/x/image/webp"
 )
 
 const rangeBytes = 256 * 1024
@@ -64,7 +70,8 @@ func (w *Worker) processOne(ctx context.Context, id int64, href string) error {
 
 	x, err := exif.Decode(bytes.NewReader(data))
 	if err != nil {
-		// sin EXIF (PNG, WebP...): no es error, simplemente no hay datos
+		// sin EXIF (PNG, WebP...): no es error; al menos sacamos las dimensiones
+		fillDims(&res, data)
 		return w.store.SaveExif(ctx, id, res)
 	}
 
@@ -113,8 +120,20 @@ func (w *Worker) processOne(ctx context.Context, id int64, href string) error {
 	if lat, lon, err := x.LatLong(); err == nil {
 		res.Lat, res.Lon = &lat, &lon
 	}
+	fillDims(&res, data)
 
 	return w.store.SaveExif(ctx, id, res)
+}
+
+// fillDims: si el EXIF no trae dimensiones, las saca de la cabecera de la imagen
+// (necesario para el layout justificado del timeline).
+func fillDims(res *store.ExifResult, data []byte) {
+	if res.Width != 0 && res.Height != 0 {
+		return
+	}
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
+		res.Width, res.Height = cfg.Width, cfg.Height
+	}
 }
 
 func trimJoin(a, b string) string {

@@ -21,6 +21,9 @@
         <button v-if="current" class="viewer-btn" :class="{ 'is-fav': tagsOpen }" :aria-label="$gettext('Add tag')" @click="toggleTags">
           <oc-icon name="price-tag-3" color="#fff" size="medium" />
         </button>
+        <button v-if="current" class="viewer-btn" :aria-label="$gettext('Archive')" @click="archive">
+          <oc-icon name="archive-2" color="#fff" size="medium" />
+        </button>
         <button class="viewer-btn" :aria-label="$gettext('Download')" @click="download">
           <oc-icon name="file-download" color="#fff" size="medium" />
         </button>
@@ -75,7 +78,7 @@ export default defineComponent({
   },
   emits: ['close', 'navigate'],
   setup(props, { emit }) {
-    const { toggleFavorite, assetTags, addTag, removeTag } = usePhotoLibrary()
+    const { toggleFavorite, assetTags, addTag, removeTag, setArchived } = usePhotoLibrary()
     const root = ref<HTMLElement | null>(null)
     const src = ref('')
     const pickerOpen = ref(false)
@@ -128,6 +131,13 @@ export default defineComponent({
       { immediate: true }
     )
 
+    const archive = async () => {
+      const p = current.value
+      if (!p) return
+      await setArchived(p.id, true)
+      emit('close')
+    }
+
     const onFavorite = async () => {
       const p = current.value
       if (p) await toggleFavorite(p)
@@ -153,7 +163,7 @@ export default defineComponent({
     }
     onMounted(() => window.addEventListener('keydown', onKey))
     onUnmounted(() => window.removeEventListener('keydown', onKey))
-    return { root, current, src, caption, download, onFavorite, pickerOpen, tagsOpen, tags, newTag, toggleTags, submitTag, dropTag }
+    return { root, current, src, caption, download, onFavorite, archive, pickerOpen, tagsOpen, tags, newTag, toggleTags, submitTag, dropTag }
   }
 })
 </script>
