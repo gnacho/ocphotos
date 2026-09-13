@@ -14,7 +14,9 @@ expuesto en el mismo origen como `/ocphotos-api/`.
 - **Auto-sync**: al abrir/enfocar y cada 30 s pide un rescan al backend y recarga el
   timeline si cambió el número de fotos (las subidas aparecen solas).
 - **Explore**: hub con buscador por fichero/cámara/ruta y accesos rápidos.
-- **Mapa**: marcadores de las fotos con GPS (`/api/geo`) sobre OpenStreetMap.
+- **Mapa**: marcadores con **miniatura de la foto** (48x48, badge de recuento en
+  los grupos) agrupados por lugar (`/api/places`), sobre OpenStreetMap. Clic en un
+  marcador abre las fotos de ese sitio. Estilo calcado del mapa de Memories.
 - **Favoritos**: marcar/desmarcar desde el visor y listado propio.
 - **"Un día como hoy"**: tira superior en el Timeline con tarjetas "hace X años"
   (rango ±3 días, como Memories) que saltan a esa fecha, más página propia agrupada
