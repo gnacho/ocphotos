@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { useAuthStore, useRouter, useSpacesStore } from '@opencloud-eu/web-pkg'
+import { useAuthStore } from '@opencloud-eu/web-pkg'
 import type { ProcessorType } from '@opencloud-eu/web-pkg'
 
 // backend photos-service (mismo origen, vía NPM). Mantiene el índice (EXIF, geo,
@@ -32,6 +32,21 @@ export interface DayBucket {
   key: string // yyyy-mm-dd
   date: Date
   photos: Photo[]
+}
+
+export interface Album {
+  id: number
+  name: string
+  count: number
+  coverId?: number
+}
+
+export interface Place {
+  lat: number
+  lon: number
+  count: number
+  coverId: number
+  name?: string
 }
 
 interface ApiAsset {
@@ -88,17 +103,8 @@ const state = {
 const previews = ref<Record<string, string>>({})
 const originals = ref<Record<string, string>>({})
 
-// formatos que cubre la app nativa de preview de OpenCloud (web-app-preview).
-// HEIC/HEIF y RAW NO están: para esos usamos nuestro visor (preview del backend).
-const NATIVE_PREVIEW_EXT = [
-  '.jpg', '.jpeg', '.png', '.gif', '.tiff', '.tif', '.bmp', '.webp', '.svg',
-  '.mp4', '.mov', '.m4v', '.webm'
-]
-
 export function usePhotoLibrary() {
   const authStore = useAuthStore()
-  const router = useRouter()
-  const spacesStore = useSpacesStore()
 
   const api = async (path: string, init?: RequestInit): Promise<Response> => {
     const token = authStore.accessToken
@@ -290,35 +296,73 @@ export function usePhotoLibrary() {
     return (json.assets ?? []).map(toPhoto)
   }
 
+  // --- Álbumes ---
+  const fetchAlbums = async (): Promise<Album[]> => {
+    const res = await api('/api/albums')
+    const json = (await res.json()) as { albums?: Album[] }
+    return json.albums ?? []
+  }
+
+  const createAlbum = async (name: string): Promise<number> => {
+    const res = await api('/api/albums', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    })
+    const json = (await res.json()) as { id: number }
+    return json.id
+  }
+
+  const renameAlbum = async (id: number, name: string): Promise<void> => {
+    await api(`/api/albums/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    })
+  }
+
+  const deleteAlbum = async (id: number): Promise<void> => {
+    await api(`/api/albums/${id}`, { method: 'DELETE' })
+  }
+
+  const albumAssets = async (id: number): Promise<Photo[]> => {
+    const res = await api(`/api/albums/${id}/assets`)
+    const json = (await res.json()) as { assets?: ApiAsset[] }
+    return (json.assets ?? []).map(toPhoto)
+  }
+
+  const addToAlbum = async (albumId: number, assetIds: number[]): Promise<void> => {
+    await api(`/api/albums/${albumId}/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assetIds })
+    })
+  }
+
+  const removeFromAlbum = async (albumId: number, assetId: number): Promise<void> => {
+    await api(`/api/albums/${albumId}/assets/${assetId}`, { method: 'DELETE' })
+  }
+
+  // --- Lugares ---
+  const fetchPlaces = async (): Promise<Place[]> => {
+    const res = await api('/api/places')
+    const json = (await res.json()) as { places?: Place[] }
+    return json.places ?? []
+  }
+
+  const placeAssets = async (lat: number, lon: number): Promise<Photo[]> => {
+    const res = await api(`/api/assets?limit=2000`)
+    const json = (await res.json()) as { assets?: ApiAsset[] }
+    const all = (json.assets ?? []).map(toPhoto)
+    const r = (v: number) => Math.round(v * 100) / 100
+    return all.filter((p) => p.lat != null && p.lon != null && r(p.lat) === r(lat) && r(p.lon) === r(lon))
+  }
+
   /** Highlights de "On this day": mismo día -> mismo mes -> más antiguas. */
   const fetchHighlights = async (): Promise<{ scope: string; photos: Photo[] }> => {
     const res = await api('/api/memories/highlights')
     const json = (await res.json()) as { scope?: string; assets?: ApiAsset[] }
     return { scope: json.scope ?? 'oldest', photos: (json.assets ?? []).map(toPhoto) }
-  }
-
-  const ext = (name: string) => {
-    const i = name.lastIndexOf('.')
-    return i >= 0 ? name.slice(i).toLowerCase() : ''
-  }
-
-  const canNativePreview = (p: Photo): boolean => NATIVE_PREVIEW_EXT.includes(ext(p.name))
-
-  /** URL del visor nativo de OpenCloud (/preview/<driveAliasAndItem>). */
-  const nativePreviewUrl = (p: Photo): string => {
-    const alias = spacesStore.personalSpace?.driveAlias ?? ''
-    const rel = p.path.replace(/^\/dav\/spaces\/[^/]+\//, '')
-    return `/preview/${alias}/${rel}`
-  }
-
-  /** Abre la foto en el visor nativo si el formato está soportado. Devuelve true
-   *  si delegó; false si hay que usar el visor propio (HEIC/RAW). */
-  const openPreview = (p: Photo): boolean => {
-    if (!canNativePreview(p)) return false
-    const space = spacesStore.personalSpace
-    if (!space) return false
-    void router.push(nativePreviewUrl(p))
-    return true
   }
 
   const searchAssets = async (q: string): Promise<Photo[]> => {
@@ -355,10 +399,16 @@ export function usePhotoLibrary() {
     fetchOnThisDay,
     fetchHighlights,
     fetchFavorites,
+    fetchAlbums,
+    createAlbum,
+    renameAlbum,
+    deleteAlbum,
+    albumAssets,
+    addToAlbum,
+    removeFromAlbum,
+    fetchPlaces,
+    placeAssets,
     searchAssets,
-    canNativePreview,
-    nativePreviewUrl,
-    openPreview,
     previews
   }
 }

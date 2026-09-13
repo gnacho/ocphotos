@@ -39,21 +39,35 @@
         </button>
       </div>
     </div>
+
+    <viewer-overlay
+      v-if="viewerList"
+      :photos="viewerList"
+      :index="viewerIndex"
+      :ensure-preview="ensurePreview"
+      :ensure-original="ensureOriginal"
+      @close="viewerList = null"
+      @navigate="viewerIndex = $event"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from 'vue'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
+import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
   name: 'ExploreView',
+  components: { ViewerOverlay },
   setup() {
-    const { searchAssets, ensurePreview, ensureOriginal, previews, openPreview } = usePhotoLibrary()
+    const { searchAssets, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
     const query = ref('')
     const results = ref<Photo[]>([])
     const loading = ref(false)
     const searched = ref(false)
+    const viewerList = ref<Photo[] | null>(null)
+    const viewerIndex = ref(0)
 
     const thumbSrc = (p: Photo) => previews.value[`${p.id}|400`]
 
@@ -71,7 +85,8 @@ export default defineComponent({
     }
 
     const open = (p: Photo) => {
-      if (!openPreview(p)) return
+      viewerList.value = results.value
+      viewerIndex.value = results.value.indexOf(p)
     }
 
     const onImgError = (e: Event) => {
@@ -80,7 +95,7 @@ export default defineComponent({
       el.onerror = null
     }
 
-    return { query, results, loading, searched, runSearch, open, thumbSrc, onImgError, ensurePreview, ensureOriginal }
+    return { query, results, loading, searched, runSearch, open, thumbSrc, onImgError, viewerList, viewerIndex, ensurePreview, ensureOriginal }
   }
 })
 </script>

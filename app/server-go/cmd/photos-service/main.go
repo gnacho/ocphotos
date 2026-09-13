@@ -17,6 +17,7 @@ import (
 	"github.com/opencloud-memories/photos-service/internal/api"
 	"github.com/opencloud-memories/photos-service/internal/dav"
 	"github.com/opencloud-memories/photos-service/internal/exif"
+	"github.com/opencloud-memories/photos-service/internal/geo"
 	"github.com/opencloud-memories/photos-service/internal/index"
 	"github.com/opencloud-memories/photos-service/internal/store"
 	"github.com/opencloud-memories/photos-service/internal/thumb"
@@ -121,7 +122,8 @@ func main() {
 
 	scanner := index.NewScanner(dc, st, log)
 	exifWorker := exif.NewWorker(dc, st, log)
-	apiSrv := api.New(st, thumbs, dc, scanner, webdavURL, cfg.scanRoot, cfg.ocBaseURL, meID, cfg.token, log)
+	geocoder := geo.New(st, log)
+	apiSrv := api.New(st, thumbs, dc, scanner, geocoder, webdavURL, cfg.scanRoot, cfg.ocBaseURL, meID, cfg.token, log)
 
 	// scan + EXIF bajo demanda y programados. El rescan bajo demanda (lo pide la
 	// extensión al abrir/enfocar para recoger fotos recién subidas) va con throttle

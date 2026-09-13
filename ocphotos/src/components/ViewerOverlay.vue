@@ -15,6 +15,9 @@
         >
           <oc-icon :name="current.favorite ? 'heart' : 'heart-3'" color="#fff" size="medium" />
         </button>
+        <button v-if="current" class="viewer-btn" :aria-label="$gettext('Add to album')" @click="pickerOpen = true">
+          <oc-icon name="album" color="#fff" size="medium" />
+        </button>
         <button class="viewer-btn" :aria-label="$gettext('Download')" @click="download">
           <oc-icon name="file-download" color="#fff" size="medium" />
         </button>
@@ -31,6 +34,8 @@
       <span v-else-if="current" class="viewer-loading" v-text="$gettext('Loading…')" />
     </div>
     <button v-if="index < photos.length - 1" class="viewer-arrow right" @click="$emit('navigate', index + 1)">›</button>
+
+    <album-picker v-if="pickerOpen && current" :asset-id="current.id" @close="pickerOpen = false" />
   </div>
 </template>
 
@@ -38,9 +43,11 @@
 import { computed, defineComponent, onMounted, onUnmounted, PropType, ref, watch } from 'vue'
 import type { ProcessorType } from '@opencloud-eu/web-pkg'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
+import AlbumPicker from './AlbumPicker.vue'
 
 export default defineComponent({
   name: 'ViewerOverlay',
+  components: { AlbumPicker },
   props: {
     photos: { type: Array as PropType<Photo[]>, required: true },
     index: { type: Number, required: true },
@@ -58,6 +65,7 @@ export default defineComponent({
     const { toggleFavorite } = usePhotoLibrary()
     const root = ref<HTMLElement | null>(null)
     const src = ref('')
+    const pickerOpen = ref(false)
     const current = computed(() => props.photos[props.index])
 
     const caption = computed(() => {
@@ -107,7 +115,7 @@ export default defineComponent({
     }
     onMounted(() => window.addEventListener('keydown', onKey))
     onUnmounted(() => window.removeEventListener('keydown', onKey))
-    return { root, current, src, caption, download, onFavorite }
+    return { root, current, src, caption, download, onFavorite, pickerOpen }
   }
 })
 </script>

@@ -40,6 +40,12 @@
               >
                 <img :src="thumbSrc(p)" :alt="p.name" loading="lazy" @error="onImgError" />
                 <span v-if="p.isVideo" class="photos-video-badge">▶</span>
+                <span
+                  class="photos-add"
+                  :title="$gettext('Add to album')"
+                  role="button"
+                  @click.stop="albumFor = p"
+                >+</span>
               </button>
             </div>
           </section>
@@ -66,6 +72,8 @@
       </aside>
     </div>
 
+    <album-picker v-if="albumFor" :asset-id="albumFor.id" @close="albumFor = null" />
+
     <viewer-overlay
       v-if="viewerList"
       :photos="viewerList"
@@ -83,15 +91,16 @@ import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useGettext } from 'vue3-gettext'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
+import AlbumPicker from '../components/AlbumPicker.vue'
 
 export default defineComponent({
   name: 'TimelineView',
-  components: { ViewerOverlay },
+  components: { ViewerOverlay, AlbumPicker },
   setup() {
     const { $gettext } = useGettext()
     const {
       photos, loading, error, months, exhausted, startAt,
-      init, loadMore, jumpTo, fetchCalendar, fetchHighlights, rescan, previews, ensurePreview, ensureOriginal, openPreview, startWatching
+      init, loadMore, jumpTo, fetchCalendar, fetchHighlights, rescan, previews, ensurePreview, ensureOriginal, startWatching
     } = usePhotoLibrary()
 
     const sentinel = ref<HTMLElement | null>(null)
@@ -138,9 +147,9 @@ export default defineComponent({
 
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
-    // formatos que el host sabe previsualizar -> visor nativo; HEIC/RAW -> el propio
+    const albumFor = ref<Photo | null>(null)
+    // visor propio (se queda dentro de la app de fotos; soporta HEIC/RAW)
     const openViewer = (list: Photo[], p: Photo) => {
-      if (openPreview(p)) return
       viewerList.value = list
       viewerIndex.value = list.indexOf(p)
     }
@@ -186,7 +195,7 @@ export default defineComponent({
     })
 
     return {
-      photos, loading, error, months, years, topYear, startAt, sentinel, onThisDay, otdTitle, jumpToPhoto,
+      photos, loading, error, months, years, topYear, startAt, sentinel, onThisDay, otdTitle, jumpToPhoto, albumFor,
       viewerList, viewerIndex, openViewer, formatDay, onImgError, jumpTo, jumpToYear,
       rescan, thumbSrc, ensurePreview, ensureOriginal
     }
@@ -242,6 +251,13 @@ export default defineComponent({
   background: var(--oc-role-surface-container, #f6f8fa); overflow: hidden;
 }
 .photos-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photos-add {
+  position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 1rem; line-height: 1; opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.photos-cell:hover .photos-add { opacity: 1; }
 .photos-video-badge {
   position: absolute; right: 4px; bottom: 4px; font-size: 0.7rem; color: #fff;
   background: rgba(0, 0, 0, 0.55); border-radius: 4px; padding: 1px 6px;

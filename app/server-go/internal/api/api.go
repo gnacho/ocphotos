@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/opencloud-memories/photos-service/internal/dav"
+	"github.com/opencloud-memories/photos-service/internal/geo"
 	"github.com/opencloud-memories/photos-service/internal/index"
 	"github.com/opencloud-memories/photos-service/internal/store"
 	"github.com/opencloud-memories/photos-service/internal/thumb"
@@ -24,6 +25,7 @@ type Server struct {
 	thumbs    *thumb.Service
 	dav       *dav.Client
 	scanner   *index.Scanner
+	geo       *geo.Geocoder
 	webdavURL string
 	scanRoot  string
 	ocBaseURL string
@@ -33,9 +35,9 @@ type Server struct {
 	rescanCh  chan struct{}
 }
 
-func New(st *store.Store, th *thumb.Service, dc *dav.Client, sc *index.Scanner, webdavURL, scanRoot, ocBaseURL, ocUserID, token string, log *slog.Logger) *Server {
+func New(st *store.Store, th *thumb.Service, dc *dav.Client, sc *index.Scanner, gc *geo.Geocoder, webdavURL, scanRoot, ocBaseURL, ocUserID, token string, log *slog.Logger) *Server {
 	return &Server{
-		st: st, thumbs: th, dav: dc, scanner: sc,
+		st: st, thumbs: th, dav: dc, scanner: sc, geo: gc,
 		webdavURL: webdavURL, scanRoot: scanRoot, ocBaseURL: ocBaseURL, ocUserID: ocUserID, token: token, log: log,
 		rescanCh: make(chan struct{}, 1),
 	}
@@ -54,7 +56,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/memories/on-this-day", s.onThisDay)
 	mux.HandleFunc("GET /api/timeline/calendar", s.calendar)
 	mux.HandleFunc("GET /api/memories/highlights", s.highlights)
-	mux.HandleFunc("GET /api/geo", s.geo)
+	mux.HandleFunc("GET /api/geo", s.geoHandler)
+	mux.HandleFunc("GET /api/places", s.places)
+	mux.HandleFunc("GET /api/albums", s.listAlbums)
+	mux.HandleFunc("POST /api/albums", s.createAlbum)
+	mux.HandleFunc("PATCH /api/albums/{id}", s.renameAlbum)
+	mux.HandleFunc("DELETE /api/albums/{id}", s.deleteAlbum)
+	mux.HandleFunc("GET /api/albums/{id}/assets", s.albumAssets)
+	mux.HandleFunc("POST /api/albums/{id}/assets", s.addToAlbum)
+	mux.HandleFunc("DELETE /api/albums/{id}/assets/{assetId}", s.removeFromAlbum)
 	mux.HandleFunc("POST /api/admin/rescan", s.rescan)
 	return s.withAuth(withCORS(mux))
 }
@@ -328,13 +338,127 @@ func (s *Server) calendar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"years": years})
 }
 
-func (s *Server) geo(w http.ResponseWriter, r *http.Request) {
+func (s *Server) geoHandler(w http.ResponseWriter, r *http.Request) {
 	list, err := s.st.GeoAssets(r.Context(), 5000)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 	writeJSON(w, map[string]any{"assets": list})
+}
+
+// --- Lugares ---
+
+// places: clusters de fotos con GPS, con nombre (geocodificación inversa cacheada).
+// Geocodifica como mucho 3 sitios nuevos por petición (límite de Nominatim).
+func (s *Server) places(w http.ResponseWriter, r *http.Request) {
+	clusters, err := s.st.PlaceClusters(r.Context(), 2)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	budget := 3
+	for i := range clusters {
+		if name, ok, _ := s.st.GetGeocode(r.Context(), clusters[i].Lat, clusters[i].Lon); ok {
+			clusters[i].Name = name
+			continue
+		}
+		if budget > 0 && s.geo != nil {
+			if name, err := s.geo.Name(r.Context(), clusters[i].Lat, clusters[i].Lon, 2); err == nil {
+				clusters[i].Name = name
+				budget--
+			}
+		}
+	}
+	writeJSON(w, map[string]any{"places": clusters})
+}
+
+// --- Álbumes ---
+
+func (s *Server) listAlbums(w http.ResponseWriter, r *http.Request) {
+	albums, err := s.st.ListAlbums(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"albums": albums})
+}
+
+func (s *Server) createAlbum(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		http.Error(w, "name required", 400)
+		return
+	}
+	id, err := s.st.CreateAlbum(r.Context(), strings.TrimSpace(body.Name))
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"id": id})
+}
+
+func (s *Server) renameAlbum(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		http.Error(w, "name required", 400)
+		return
+	}
+	if err := s.st.RenameAlbum(r.Context(), id, strings.TrimSpace(body.Name)); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) deleteAlbum(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err := s.st.DeleteAlbum(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) albumAssets(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	list, err := s.st.AlbumAssets(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"assets": list})
+}
+
+func (s *Server) addToAlbum(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	var body struct {
+		AssetIDs []int64 `json:"assetIds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.AssetIDs) == 0 {
+		http.Error(w, "assetIds required", 400)
+		return
+	}
+	if err := s.st.AddToAlbum(r.Context(), id, body.AssetIDs); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) removeFromAlbum(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	assetID, _ := strconv.ParseInt(r.PathValue("assetId"), 10, 64)
+	if err := s.st.RemoveFromAlbum(r.Context(), id, assetID); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) rescan(w http.ResponseWriter, r *http.Request) {

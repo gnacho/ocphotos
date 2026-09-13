@@ -47,6 +47,28 @@ CREATE TABLE IF NOT EXISTS scan_state (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS albums (
+    id         INTEGER PRIMARY KEY,
+    name       TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE TABLE IF NOT EXISTS album_assets (
+    album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+    asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    added_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    PRIMARY KEY (album_id, asset_id)
+);
+CREATE INDEX IF NOT EXISTS album_assets_asset ON album_assets (asset_id);
+
+-- caché de geocodificación inversa (Lugares): clave = coords redondeadas
+CREATE TABLE IF NOT EXISTS geocode (
+    lat_key REAL NOT NULL,
+    lon_key REAL NOT NULL,
+    name    TEXT NOT NULL,
+    ts      INTEGER NOT NULL,
+    PRIMARY KEY (lat_key, lon_key)
+);
 `
 
 type Asset struct {
@@ -348,6 +370,165 @@ func (s *Store) OldestAssets(ctx context.Context, limit int) ([]Asset, error) {
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// --- Álbumes ---
+
+type Album struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Count     int    `json:"count"`
+	CoverID   int64  `json:"coverId,omitempty"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+func (s *Store) CreateAlbum(ctx context.Context, name string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `INSERT INTO albums (name) VALUES (?)`, name)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+func (s *Store) RenameAlbum(ctx context.Context, id int64, name string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE albums SET name=? WHERE id=?`, name, id)
+	return err
+}
+
+func (s *Store) DeleteAlbum(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM albums WHERE id=?`, id)
+	return err
+}
+
+// ListAlbums: álbumes con recuento de fotos vivas y portada (la más reciente).
+func (s *Store) ListAlbums(ctx context.Context) ([]Album, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT a.id, a.name, a.created_at,
+		  (SELECT count(*) FROM album_assets aa JOIN assets s ON s.id=aa.asset_id
+		     WHERE aa.album_id=a.id AND s.deleted_at IS NULL) AS cnt,
+		  COALESCE((SELECT aa.asset_id FROM album_assets aa JOIN assets s ON s.id=aa.asset_id
+		     WHERE aa.album_id=a.id AND s.deleted_at IS NULL
+		     ORDER BY s.taken_at DESC LIMIT 1), 0) AS cover
+		FROM albums a ORDER BY a.name COLLATE NOCASE`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Album{}
+	for rows.Next() {
+		var al Album
+		if err := rows.Scan(&al.ID, &al.Name, &al.CreatedAt, &al.Count, &al.CoverID); err != nil {
+			return nil, err
+		}
+		out = append(out, al)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) AlbumAssets(ctx context.Context, albumID int64) ([]Asset, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+assetCols+` FROM assets
+		WHERE deleted_at IS NULL AND id IN (SELECT asset_id FROM album_assets WHERE album_id=?)
+		ORDER BY taken_at DESC`, albumID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Asset{}
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) AddToAlbum(ctx context.Context, albumID int64, assetIDs []int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	stmt, err := tx.PrepareContext(ctx, `INSERT OR IGNORE INTO album_assets (album_id, asset_id) VALUES (?,?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, id := range assetIDs {
+		if _, err := stmt.ExecContext(ctx, albumID, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) RemoveFromAlbum(ctx context.Context, albumID, assetID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM album_assets WHERE album_id=? AND asset_id=?`, albumID, assetID)
+	return err
+}
+
+// --- Lugares ---
+
+type Place struct {
+	Lat     float64 `json:"lat"`
+	Lon     float64 `json:"lon"`
+	Count   int     `json:"count"`
+	CoverID int64   `json:"coverId"`
+	Name    string  `json:"name,omitempty"`
+}
+
+// PlaceClusters agrupa las fotos con GPS por coordenadas redondeadas a `decimals`
+// decimales (~1 km con 2). Devuelve la portada (foto más reciente de cada sitio).
+func (s *Store) PlaceClusters(ctx context.Context, decimals int) ([]Place, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT round(lat, ?) AS rlat, round(lon, ?) AS rlon, count(*) AS cnt
+		FROM assets WHERE deleted_at IS NULL AND lat IS NOT NULL
+		GROUP BY rlat, rlon ORDER BY cnt DESC`, decimals, decimals)
+	if err != nil {
+		return nil, err
+	}
+	out := []Place{}
+	for rows.Next() {
+		var p Place
+		if err := rows.Scan(&p.Lat, &p.Lon, &p.Count); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// portadas FUERA del cursor: con MaxOpenConns(1) no se puede consultar mientras
+	// el rows sigue abierto (deadlock).
+	for i := range out {
+		_ = s.db.QueryRowContext(ctx,
+			`SELECT id FROM assets WHERE deleted_at IS NULL AND round(lat,?)=? AND round(lon,?)=?
+			 ORDER BY taken_at DESC LIMIT 1`, decimals, out[i].Lat, decimals, out[i].Lon).Scan(&out[i].CoverID)
+	}
+	return out, nil
+}
+
+// --- caché de geocodificación (Lugares) ---
+
+func (s *Store) GetGeocode(ctx context.Context, latKey, lonKey float64) (string, bool, error) {
+	var name string
+	err := s.db.QueryRowContext(ctx, `SELECT name FROM geocode WHERE lat_key=? AND lon_key=?`, latKey, lonKey).Scan(&name)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return name, true, nil
+}
+
+func (s *Store) SaveGeocode(ctx context.Context, latKey, lonKey float64, name string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO geocode (lat_key, lon_key, name, ts) VALUES (?,?,?,unixepoch())`,
+		latKey, lonKey, name)
+	return err
 }
 
 func (s *Store) GeoAssets(ctx context.Context, limit int) ([]Asset, error) {

@@ -10,6 +10,7 @@ import '@opencloud-eu/extension-sdk/tailwind.css'
 import { RouteRecordRaw } from 'vue-router'
 import { computed } from 'vue'
 import { useGettext } from 'vue3-gettext'
+import translations from '../l10n/translations.json'
 
 export default defineWebApplication({
   setup(args) {
@@ -55,6 +56,24 @@ export default defineWebApplication({
         }
       },
       {
+        path: '/albums',
+        name: 'photos-albums',
+        component: () => import('./views/AlbumsView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Albums')
+        }
+      },
+      {
+        path: '/places',
+        name: 'photos-places',
+        component: () => import('./views/PlacesView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Places')
+        }
+      },
+      {
         path: '/map',
         name: 'photos-map',
         component: () => import('./views/MapView.vue'),
@@ -95,10 +114,22 @@ export default defineWebApplication({
         priority: 30
       },
       {
+        name: $gettext('Albums'),
+        icon: 'album',
+        route: { path: `/${appInfo.id}/albums` },
+        priority: 35
+      },
+      {
+        name: $gettext('Places'),
+        icon: 'map-pin',
+        route: { path: `/${appInfo.id}/places` },
+        priority: 40
+      },
+      {
         name: $gettext('Map'),
         icon: 'map-2',
         route: { path: `/${appInfo.id}/map` },
-        priority: 40
+        priority: 45
       },
       {
         name: $gettext('Favorites'),
@@ -129,6 +160,7 @@ export default defineWebApplication({
       appInfo,
       routes,
       navItems,
+      translations,
       extensions: extensions(args)
     }
   }

@@ -38,7 +38,7 @@ export default defineComponent({
   name: 'FavoritesView',
   components: { ViewerOverlay },
   setup() {
-    const { fetchFavorites, ensurePreview, ensureOriginal, previews, openPreview } = usePhotoLibrary()
+    const { fetchFavorites, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
     const loading = ref(true)
     const photos = ref<Photo[]>([])
     const viewerList = ref<Photo[] | null>(null)
@@ -47,7 +47,6 @@ export default defineComponent({
     const thumbSrc = (p: Photo) => previews.value[`${p.id}|400`]
 
     const openViewer = (i: number) => {
-      if (openPreview(photos.value[i])) return
       viewerList.value = photos.value
       viewerIndex.value = i
     }
