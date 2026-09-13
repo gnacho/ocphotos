@@ -160,7 +160,8 @@ export default defineComponent({
 
 <style scoped>
 .viewer {
-  position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column;
+  /* por encima de los panes de Leaflet (400-1000) y de los modales */
+  position: fixed; inset: 0; z-index: var(--z-index-modal, 9999); display: flex; flex-direction: column;
   background: rgba(0, 0, 0, 0.96);
 }
 .viewer-top {
