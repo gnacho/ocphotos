@@ -102,7 +102,6 @@ export default defineComponent({
 }
 .map-toolbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .map-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
-.map-nav { margin-left: auto; display: flex; gap: 16px; font-size: 0.85rem; }
 .map-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
 .map-canvas { flex: 1; min-height: 0; }
 </style>

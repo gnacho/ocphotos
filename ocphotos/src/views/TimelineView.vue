@@ -202,7 +202,6 @@ export default defineComponent({
 }
 .photos-title { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .photos-progress, .photos-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
-.photos-nav { margin-left: auto; display: flex; gap: 16px; font-size: 0.85rem; }
 .photos-error { padding: 16px; color: var(--oc-role-error, #ba1a1a); }
 .photos-empty {
   display: flex; flex-direction: column; align-items: center; gap: 8px;

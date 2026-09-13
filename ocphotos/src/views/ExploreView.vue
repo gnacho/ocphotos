@@ -92,7 +92,6 @@ export default defineComponent({
   padding: 8px 16px; border-bottom: 1px solid var(--oc-role-outline-variant, #bfc8cc);
 }
 .explore-toolbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
-.explore-nav { display: flex; gap: 16px; font-size: 0.85rem; }
 .explore-body { flex: 1; overflow-y: auto; padding: 16px; }
 .explore-search { display: flex; gap: 8px; max-width: 640px; margin-bottom: 20px; }
 .explore-input {

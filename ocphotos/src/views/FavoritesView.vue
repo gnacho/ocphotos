@@ -87,7 +87,6 @@ export default defineComponent({
 }
 .fav-toolbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .fav-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
-.fav-nav { margin-left: auto; display: flex; gap: 16px; font-size: 0.85rem; }
 .fav-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
 .fav-scroll { flex: 1; overflow-y: auto; padding: 0 8px; }
 .fav-grid { display: grid; gap: 3px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
