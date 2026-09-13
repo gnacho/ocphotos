@@ -1,0 +1,31 @@
+# OpenCloud Memories — despliegue junto a tu OpenCloud existente.
+#
+# 1. Crea un app-token en OpenCloud: Ajustes del usuario → Seguridad → App tokens
+# 2. Rellena las variables de entorno (o usa un .env)
+# 3. docker compose up -d
+# 4. Abre http://<tu-servidor>:9210  (o detrás de tu reverse proxy con TLS)
+
+services:
+  memories:
+    build: .
+    container_name: opencloud-memories
+    restart: unless-stopped
+    ports:
+      - "9210:9210"
+    environment:
+      # --- obligatorio ---
+      OC_BASE_URL: ${OC_BASE_URL:?ej https://cloud.midominio.es}
+      OC_USER: ${OC_USER:?tu usuario}
+      OC_APP_TOKEN: ${OC_APP_TOKEN:?app-token de OpenCloud}
+      MEMORIES_TOKEN: ${MEMORIES_TOKEN:?token propio para la PWA}
+      # --- opcional (defaults razonables) ---
+      SCAN_ROOT: ${SCAN_ROOT:-Fotos}     # carpeta raíz; "" = todo el espacio
+      SCAN_EVERY: ${SCAN_EVERY:-30m}     # rescans incrementales
+      TZ: ${TZ:-Europe/Madrid}
+    volumes:
+      - memories-data:/data              # sqlite + caché de thumbnails
+    # si OpenCloud corre en otra máquina no hace falta red compartida;
+    # basta con que este contenedor alcance OC_BASE_URL por HTTPS.
+
+volumes:
+  memories-data:

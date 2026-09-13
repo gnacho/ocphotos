@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Heart, Play } from 'lucide-react'
 import type { DayBucket, PhotoAsset } from '@/lib/types'
 import { useStore } from '@/lib/store'
@@ -10,7 +10,7 @@ function Thumb({ asset, onClick }: { asset: PhotoAsset; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group relative m-[1.5px] block grow overflow-hidden bg-neutral-800 focus:outline-none"
+      className="group relative m-[1.5px] block grow overflow-hidden bg-raised focus:outline-none"
       style={{ aspectRatio: `${asset.width}/${asset.height}`, flexGrow: ar * 100, flexBasis: ar * 140 }}
     >
       <img
@@ -33,9 +33,9 @@ function DaySection({ day }: { day: DayBucket }) {
   const { openViewer } = useStore()
   return (
     <section style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 400px' }}>
-      <h3 className="sticky top-0 z-10 -mx-1 bg-neutral-950/90 px-1 pb-2 pt-4 text-[13px] font-medium capitalize text-neutral-300 backdrop-blur">
+      <h3 className="sticky top-0 z-10 -mx-1 bg-app px-1 pb-2 pt-4 text-[13px] font-medium capitalize text-main backdrop-blur">
         {fmtDay.format(day.date)}
-        <span className="ml-2 text-neutral-600">{day.assets.length}</span>
+        <span className="ml-2 text-faint">{day.assets.length}</span>
       </h3>
       <div className="flex flex-wrap">
         {day.assets.map((a, i) => (
@@ -47,12 +47,22 @@ function DaySection({ day }: { day: DayBucket }) {
 }
 
 export default function Timeline() {
-  const { days, query, personFilter } = useStore()
+  const { days, query, personFilter, mode, hasMore, loadMore, loadingMore, stats } = useStore()
   const total = useMemo(() => days.reduce((n, d) => n + d.assets.length, 0), [days])
+  const sentinel = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (mode !== 'service' || !sentinel.current) return
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadMore()
+    }, { rootMargin: '1200px' })
+    obs.observe(sentinel.current)
+    return () => obs.disconnect()
+  }, [mode, loadMore])
 
   if (days.length === 0) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-2 text-neutral-500">
+      <div className="flex h-64 flex-col items-center justify-center gap-2 text-dim">
         <p className="text-lg">Sin resultados</p>
         <p className="text-sm">{query || personFilter ? 'Prueba con otra búsqueda' : 'Conecta tu OpenCloud para ver tus fotos'}</p>
       </div>
@@ -61,10 +71,15 @@ export default function Timeline() {
 
   return (
     <div className="px-2 pb-24 md:px-4">
-      <p className="px-1 pt-3 text-xs text-neutral-600">{total.toLocaleString('es')} elementos</p>
+      <p className="px-1 pt-3 text-xs text-faint">
+        {mode === 'service' && stats ? `${stats.assets.toLocaleString('es')} elementos en el índice · ${total.toLocaleString('es')} cargados` : `${total.toLocaleString('es')} elementos`}
+      </p>
       {days.map((d) => (
         <DaySection key={d.key} day={d} />
       ))}
+      <div ref={sentinel} className="flex justify-center py-6 text-xs text-faint">
+        {mode === 'service' && (loadingMore ? 'Cargando…' : hasMore ? '' : 'Fin de la librería')}
+      </div>
     </div>
   )
 }

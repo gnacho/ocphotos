@@ -1,6 +1,6 @@
 {
-  "name": "ocphotos",
-  "short_name": "ocphotos",
+  "name": "OpenCloud Memories",
+  "short_name": "Memories",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0a0a0a",

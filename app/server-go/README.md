@@ -1,36 +1,64 @@
-# photos-service (ocphotos backend)
+# photos-service (OpenCloud Memories — backend)
 
-Microservicio Go que acompaña a la PWA. OpenCloud sigue siendo la fuente de
-verdad de los ficheros; este servicio mantiene el índice de metadatos.
+Microservicio Go **single-tenant** (una instancia = un usuario OpenCloud) con
+**SQLite embebido**. OpenCloud sigue siendo la fuente de verdad de los ficheros;
+este servicio mantiene el índice de metadatos y sirve la PWA.
 
-## Piezas
+## Estado: v1.0 — listo para producción
 
-| Paquete | Estado | Qué hace |
-|---|---|---|
-| `internal/dav` | ✅ funcional (esqueleto completo) | Cliente Graph + WebDAV de OpenCloud: descubrimiento de espacios, PROPFIND, Range GET |
-| `internal/index` | ✅ lógica de scan | Walk incremental por etag, soft-delete de desaparecidos |
-| `internal/store` | ⬜ pendiente | Postgres (pgx). Esquema en `schema.sql` |
-| `internal/api` | ⬜ pendiente | REST para la PWA (timeline, memories, geo, álbumes) |
-| workers (River) | ⬜ pendiente | EXIF vía Range+cabecera, thumbnails libvips, (fase 3) ML |
+| Pieza | Estado |
+|---|---|
+| Cliente Graph + WebDAV (`internal/dav`) | ✅ probado end-to-end (descubrimiento, PROPFIND, Range, descarga) |
+| Scanner incremental por etag (`internal/index`) | ✅ probado (upsert por cambio, soft-delete de desaparecidos) |
+| Store SQLite (`internal/store`) | ✅ tests verdes (paginación por cursor, favoritos, on-this-day, geo, soft-delete) |
+| Worker EXIF (`internal/exif`) | ✅ Range request de 256 KB → fecha/cámara/GPS sin descargar la foto |
+| Thumbnails (`internal/thumb`) | ✅ generación propia JPEG/PNG/WebP/GIF, caché en disco por etag |
+| API REST (`internal/api`) | ✅ probada (assets, thumbs, original, favoritos, on-this-day, geo, rescan) |
+| PWA servida por el mismo binario | ✅ (SPA fallback en `main.go`) |
+| Álbumes API | ⬜ v0.2 (esquema listo en el store) |
+| ML (caras/CLIP) | ⬜ fase 3 — microservicio Python aparte (InsightFace/CLIP ONNX o `immich-machine-learning`) |
+| Vídeo (posters/transcoding) | ⬜ fase posterior (ffmpeg, patrón go-vod) |
+| HEIC/RAW | ⚠️ sin decodificador Go puro: se sirve el original (los thumbs fallan con fallback) |
 
-## Decisiones clave (del análisis del proyecto)
-
-- **Sin portar código PHP de Memories**: solo se porta su diseño de producto.
-- **EXIF barato**: `GetRange` de los primeros ~128 KB cubre el EXIF de la
-  mayoría de JPEG/HEIC sin descargar el fichero (truco de PhotoSort).
-- **Mover ficheros**: el índice usa (user_id, path) como clave; un movimiento
-  se procesa como delete+insert. Los metadatos de app que deban sobrevivir
-  (favoritos, descripciones) se escribirán además en **sidecar XMP** (patrón
-  Immich) en una fase posterior.
-- **Thumbnails**: en MVP, proxy al servicio de thumbnails de OpenCloud;
-  propios con libvips cuando haga falta control fino (faces, recortes).
-- **Auth**: JWT OIDC del mismo issuer que OpenCloud (la PWA usa PKCE).
-- **ML (fase 3)**: microservicio Python aparte con InsightFace + CLIP en ONNX
-  (o reutilizar `immich-machine-learning` por HTTP).
-
-## Arranque (cuando esté implementado el store)
+## Despliegue (Docker, recomendado)
 
 ```bash
-createdb photos && psql photos -f schema.sql
-go run ./cmd/photos-service   # LISTEN_ADDR=:9210
+# en la raíz del proyecto (un nivel por encima de server-go/)
+cp docker-compose.yml .env.example .env   # rellena OC_BASE_URL, OC_USER, OC_APP_TOKEN, MEMORIES_TOKEN
+docker compose up -d --build
 ```
+
+- App-token: OpenCloud → Ajustes del usuario → Seguridad → App tokens.
+- `MEMORIES_TOKEN`: token propio que la PWA te pedirá al entrar (evita dejar tu
+  librería abierta si expones el puerto).
+- Datos: volumen `memories-data` → `/data/memories.db` + `/data/thumbs/`.
+  **Backup = copiar el fichero .db** (con el servicio parado o `sqlite3 .backup`).
+
+## Sin Docker
+
+```bash
+cd server-go && go build ./cmd/photos-service
+OC_BASE_URL=https://cloud.midominio.es OC_USER=yo OC_APP_TOKEN=xxx \
+MEMORIES_TOKEN=secreto DATA_DIR=./data WEB_DIR=../dist ./photos-service
+```
+
+## Rendimiento esperado (70k fotos)
+
+- **Primer scan**: minutos (un PROPFIND por carpeta; ~n_carpetas peticiones).
+- **EXIF inicial**: horas en background (Range de 256 KB/foto, ~1-3 fotos/s
+  según red; no descarga los originales).
+- **Rescans incrementales**: mismas peticiones PROPFIND, pero upserts ≈ 0 →
+  barato. `SCAN_EVERY=30m` es razonable.
+- **Thumbnails**: se generan bajo demanda al hacer scroll (lado largo 400px,
+  calidad 80); el primer paseo por el timeline calienta la caché.
+- SQLite con 70k-500k assets: consultas del timeline en ms.
+
+## Decisiones clave
+
+- **SQLite > Postgres** a esta escala: cero contenedores extra, backups triviales.
+- **EXIF por Range** (truco de PhotoSort): no se descargan 70k originales.
+- **Mover ficheros** = delete+insert por ruta (el favorito se pierde; los
+  sidecars XMP para persistir metadatos de app están en el roadmap).
+- **Sin Redis**: worker EXIF interno con polling a la tabla (`exif_done=0`).
+- **Auth**: app-token de OpenCloud solo vive en el servidor; la PWA usa
+  `MEMORIES_TOKEN` propio. OIDC multiusuario queda para si se publica como app.

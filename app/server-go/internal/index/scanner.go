@@ -1,110 +1,87 @@
-// Package index recorre el árbol WebDAV de un usuario y mantiene
-// la tabla assets sincronizada (upsert por etag, soft-delete de desaparecidos).
+// Package index — scanner WebDAV incremental sobre OpenCloud.
 package index
 
 import (
 	"context"
 	"log/slog"
 	"net/url"
-	"strings"
+	"path"
+	"time"
 
-	"github.com/gnacho/ocphotos/photos-service/internal/dav"
+	"github.com/opencloud-memories/photos-service/internal/dav"
+	"github.com/opencloud-memories/photos-service/internal/store"
 )
 
-type AssetStore interface {
-	Upsert(ctx context.Context, a Asset) error
-	MarkMissingExcept(ctx context.Context, userID string, seenETags []string) (int, error)
-	EnqueueExif(assetID int64) error
-}
-
-type Asset struct {
-	UserID string
-	Path   string
-	ETag   string
-	Name   string
-	Size   int64
-	MTime  interface{ Unix() int64 }
-}
-
-// Scanner mantiene el índice de un espacio OpenCloud.
-// Estrategia: walk completo incremental comparando etags (el filecache lo hace
-// el propio OpenCloud; nosotros solo lo consultamos). Un rescan de 50k ficheros
-// son ~N_carpetas PROPFINDs; viable cada X minutos por usuario.
 type Scanner struct {
 	dav   *dav.Client
-	store AssetStore
+	store *store.Store
 	log   *slog.Logger
 }
 
-func NewScanner(c *dav.Client, s AssetStore, log *slog.Logger) *Scanner {
-	return &Scanner{dav: c, store: s, log: log}
+func NewScanner(c *dav.Client, st *store.Store, log *slog.Logger) *Scanner {
+	return &Scanner{dav: c, store: st, log: log}
 }
 
-// ScanSpace recorre un espacio completo a partir de su raíz (p. ej. "Fotos").
-func (s *Scanner) ScanSpace(ctx context.Context, userID, webdavURL, root string) error {
-	type pending struct{ rel string }
-	queue := []pending{{rel: root}}
-	seen := []string{}
+// ScanSpace recorre un espacio desde root (p. ej. "Fotos"; "" = todo el espacio).
+// Incremental por etag: upsert solo de lo cambiado; soft-delete de lo desaparecido.
+// 70k fotos ≈ unos pocos miles de PROPFINDs: varios minutos el primer scan,
+// segundos los incrementales (mismo número de peticiones, pero upserts ≈ 0).
+func (s *Scanner) ScanSpace(ctx context.Context, webdavURL, root string) error {
+	start := time.Now()
+	queue := []string{root}
+	seen := map[string]bool{}
+	var scanned, changed int
 
 	for len(queue) > 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		cur := queue[0]
 		queue = queue[1:]
 
-		entries, err := s.dav.ListFolder(ctx, webdavURL, cur.rel)
+		entries, err := s.dav.ListFolder(ctx, webdavURL, cur)
 		if err != nil {
-			s.log.Warn("propfind falló, se omite", "path", cur.rel, "err", err)
+			s.log.Warn("propfind falló, se omite", "path", cur, "err", err)
 			continue
 		}
-		for i, e := range entries {
-			if i == 0 { // PROPFIND depth=1 incluye la propia carpeta
-				continue
-			}
-			p, _ := url.PathUnescape(e.Href)
+		for _, e := range entries {
 			if e.IsDir {
-				queue = append(queue, pending{rel: relOf(p)})
+				queue = append(queue, e.Href) // href absoluto; ListFolder lo resuelve
 				continue
 			}
 			if !e.IsMedia() {
 				continue
 			}
-			seen = append(seen, e.ETag)
-			// Upsert solo si el etag cambió (el store compara antes de tocar nada)
-			if err := s.store.Upsert(ctx, Asset{
-				UserID: userID,
-				Path:   p,
-				ETag:   e.ETag,
-				Name:   base(p),
-				Size:   e.Size,
-				MTime:  e.LastModified,
-			}); err != nil {
+			scanned++
+			seen[e.ETag] = true
+			mt := "image"
+			if e.IsVideo() {
+				mt = "video"
+			}
+			mtime := e.LastModified
+			if mtime.IsZero() {
+				mtime = time.Now()
+			}
+			p, _ := url.PathUnescape(e.Href)
+			_, ch, err := s.store.UpsertByETag(ctx, p, e.ETag, path.Base(p), mt, mtime, e.Size)
+			if err != nil {
 				s.log.Error("upsert", "path", p, "err", err)
+				continue
+			}
+			if ch {
+				changed++
 			}
 		}
 	}
 
-	// lo que estaba indexado y ya no aparece → soft-delete (papelera lógica)
-	removed, err := s.store.MarkMissingExcept(ctx, userID, seen)
+	removed, err := s.store.SoftDeleteExcept(ctx, seen)
 	if err != nil {
 		return err
 	}
-	s.log.Info("scan completado", "user", userID, "vistos", len(seen), "eliminados", removed)
+	s.log.Info("scan completado",
+		"escaneados", scanned, "cambiados", changed, "eliminados", removed,
+		"duracion", time.Since(start).Round(time.Second))
 	return nil
-}
-
-func relOf(href string) string {
-	// extrae la ruta relativa dentro del space a partir del href DAV
-	if i := strings.Index(href, "/dav/spaces/"); i >= 0 {
-		parts := strings.SplitN(href[i:], "/", 4)
-		if len(parts) == 4 {
-			return parts[3]
-		}
-	}
-	return strings.TrimPrefix(href, "/")
-}
-
-func base(p string) string {
-	if i := strings.LastIndex(p, "/"); i >= 0 {
-		return p[i+1:]
-	}
-	return p
 }

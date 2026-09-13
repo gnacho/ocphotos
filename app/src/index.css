@@ -73,3 +73,35 @@
     @apply bg-background text-foreground;
   }
 }
+/* --- OpenCloud Memories: theming claro/oscuro --- */
+@layer base {
+  :root {
+    --ocm-bg: 245 246 248;        /* fondo página (gris OpenCloud) */
+    --ocm-surface: 255 255 255;   /* tarjetas, inputs */
+    --ocm-raised: 240 241 243;    /* hover, chips */
+    --ocm-border: 228 230 234;
+    --ocm-text: 28 30 34;         /* texto principal */
+    --ocm-dim: 95 100 110;        /* texto secundario */
+    --ocm-faint: 150 155 163;     /* metadatos */
+  }
+  .dark {
+    --ocm-bg: 10 10 10;
+    --ocm-surface: 23 23 23;
+    --ocm-raised: 38 38 38;
+    --ocm-border: 38 38 38;
+    --ocm-text: 229 229 229;
+    --ocm-dim: 115 115 115;
+    --ocm-faint: 82 82 82;
+  }
+}
+
+@layer utilities {
+  .bg-app { background-color: rgb(var(--ocm-bg)); }
+  .bg-surface { background-color: rgb(var(--ocm-surface)); }
+  .bg-raised { background-color: rgb(var(--ocm-raised)); }
+  .border-app { border-color: rgb(var(--ocm-border)); }
+  .text-main { color: rgb(var(--ocm-text)); }
+  .text-dim { color: rgb(var(--ocm-dim)); }
+  .text-faint { color: rgb(var(--ocm-faint)); }
+  .placeholder-faint::placeholder { color: rgb(var(--ocm-faint)); }
+}

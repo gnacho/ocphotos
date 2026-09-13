@@ -1,5 +1,5 @@
 // Package dav implementa el cliente WebDAV/Graph de OpenCloud.
-// Patrón validado por el proyecto PhotoSort: Graph para descubrir espacios,
+// Patrón validado por PhotoSort: Graph para descubrir espacios,
 // PROPFIND para recorrer, GET/Range para contenido. Auth: usuario + app-token.
 package dav
 
@@ -27,7 +27,7 @@ const propfindBody = `<?xml version="1.0"?>
 
 var imageExt = map[string]bool{
 	".jpg": true, ".jpeg": true, ".png": true, ".heic": true, ".heif": true,
-	".webp": true, ".gif": true, ".tiff": true, ".dng": true, ".raw": true,
+	".webp": true, ".gif": true, ".tiff": true, ".dng": true,
 }
 
 var videoExt = map[string]bool{
@@ -35,10 +35,10 @@ var videoExt = map[string]bool{
 }
 
 type Client struct {
-	base     string
-	user     string
-	token    string
-	http     *http.Client
+	base  string
+	user  string
+	token string
+	http  *http.Client
 }
 
 func New(baseURL, user, appToken string) *Client {
@@ -46,8 +46,16 @@ func New(baseURL, user, appToken string) *Client {
 		base:  strings.TrimRight(baseURL, "/"),
 		user:  user,
 		token: appToken,
-		http:  &http.Client{Timeout: 60 * time.Second},
+		http:  &http.Client{Timeout: 120 * time.Second},
 	}
+}
+
+// FileURL resuelve un href DAV (ruta absoluta del servidor) a URL completa.
+func (c *Client) FileURL(href string) string {
+	if strings.HasPrefix(href, "http") {
+		return href
+	}
+	return c.base + href
 }
 
 type Drive struct {
@@ -103,6 +111,10 @@ func (e Entry) IsMedia() bool {
 	return imageExt[ext] || videoExt[ext]
 }
 
+func (e Entry) IsVideo() bool {
+	return videoExt[strings.ToLower(path.Ext(e.Href))]
+}
+
 type multistatus struct {
 	Responses []struct {
 		Href     string `xml:"href"`
@@ -116,21 +128,30 @@ type multistatus struct {
 				Length       int64  `xml:"getcontentlength"`
 				ContentType  string `xml:"getcontenttype"`
 			} `xml:"prop"`
+			Status string `xml:"status"`
 		} `xml:"propstat"`
 	} `xml:"response"`
 }
 
-// ListFolder hace PROPFIND depth=1 sobre una carpeta.
-func (c *Client) ListFolder(ctx context.Context, webdavURL, relPath string) ([]Entry, error) {
-	u := strings.TrimRight(webdavURL, "/")
-	if relPath != "" {
-		for _, seg := range strings.Split(strings.Trim(relPath, "/"), "/") {
+// ListFolder hace PROPFIND depth=1. folderRef admite ruta relativa al space
+// ("Viajes/2025") o href absoluto devuelto por un listado anterior.
+func (c *Client) ListFolder(ctx context.Context, webdavURL, folderRef string) ([]Entry, error) {
+	var u string
+	if strings.HasPrefix(folderRef, "/") {
+		u = c.base + folderRef
+	} else if folderRef == "" {
+		u = strings.TrimRight(webdavURL, "/") + "/"
+	} else {
+		u = strings.TrimRight(webdavURL, "/")
+		for _, seg := range strings.Split(strings.Trim(folderRef, "/"), "/") {
 			if seg == ".." {
-				return nil, fmt.Errorf("path traversal rechazado: %q", relPath)
+				return nil, fmt.Errorf("path traversal rechazado: %q", folderRef)
 			}
 			u += "/" + url.PathEscape(seg)
 		}
+		u += "/"
 	}
+
 	req, _ := http.NewRequestWithContext(ctx, "PROPFIND", u, bytes.NewBufferString(propfindBody))
 	req.SetBasicAuth(c.user, c.token)
 	req.Header.Set("Depth", "1")
@@ -142,10 +163,10 @@ func (c *Client) ListFolder(ctx context.Context, webdavURL, relPath string) ([]E
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("carpeta no encontrada: %s", relPath)
+		return nil, fmt.Errorf("carpeta no encontrada: %s", folderRef)
 	}
 	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("propfind %s: %s", relPath, resp.Status)
+		return nil, fmt.Errorf("propfind %s: %s", folderRef, resp.Status)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -155,9 +176,15 @@ func (c *Client) ListFolder(ctx context.Context, webdavURL, relPath string) ([]E
 	if err := xml.Unmarshal(body, &ms); err != nil {
 		return nil, err
 	}
+
+	selfPath, _ := url.Parse(u)
 	entries := make([]Entry, 0, len(ms.Responses))
 	for _, r := range ms.Responses {
-		if len(r.PropStat) == 0 {
+		// excluye la entrada de la propia carpeta
+		if selfPath != nil && r.Href == selfPath.Path {
+			continue
+		}
+		if len(r.PropStat) == 0 || !strings.Contains(r.PropStat[0].Status, "200") {
 			continue
 		}
 		p := r.PropStat[0].Prop
@@ -175,8 +202,8 @@ func (c *Client) ListFolder(ctx context.Context, webdavURL, relPath string) ([]E
 }
 
 // GetRange descarga los primeros n bytes (cabecera EXIF sin bajar el fichero entero).
-func (c *Client) GetRange(ctx context.Context, fileURL string, n int64) ([]byte, error) {
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
+func (c *Client) GetRange(ctx context.Context, href string, n int64) ([]byte, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.FileURL(href), nil)
 	req.SetBasicAuth(c.user, c.token)
 	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", n-1))
 	resp, err := c.http.Do(req)
@@ -184,5 +211,24 @@ func (c *Client) GetRange(ctx context.Context, fileURL string, n int64) ([]byte,
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("range %s: %s", href, resp.Status)
+	}
 	return io.ReadAll(resp.Body)
+}
+
+// Download abre un stream del fichero completo (caller cierra el body).
+func (c *Client) Download(ctx context.Context, href string) (io.ReadCloser, string, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.FileURL(href), nil)
+	req.SetBasicAuth(c.user, c.token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	if resp.StatusCode >= 300 {
+		resp.Body.Close()
+		return nil, "", fmt.Errorf("download %s: %s", href, resp.Status)
+	}
+	ct := resp.Header.Get("Content-Type")
+	return resp.Body, ct, nil
 }
