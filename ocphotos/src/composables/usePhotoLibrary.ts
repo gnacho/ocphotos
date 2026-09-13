@@ -122,7 +122,7 @@ export function usePhotoLibrary() {
     let rootOk = true
     while (queue.length) {
       const current = queue.shift()!
-      state.progress.value = `${folders} carpetas · ${found.length} fotos`
+      state.progress.value = `${folders} folders · ${found.length} photos`
       let children: Resource[] = []
       try {
         const res = await clientService.webdav.listFiles(space, { path: current })
@@ -159,12 +159,13 @@ export function usePhotoLibrary() {
       if (!space) throw new Error('Espacio personal no disponible')
 
       if (!force) {
+        // Muestra la caché al instante si tiene contenido y refresca en segundo
+        // plano. Una caché VACÍA se ignora (si no, una carpeta escaneada vacía
+        // se queda "vacía" para siempre hasta que expire el TTL).
         const cached = loadCache(root)
-        if (cached) {
+        if (cached && cached.length) {
           state.photos.value = cached
           state.root.value = root
-          state.loading.value = false
-          return
         }
       }
 

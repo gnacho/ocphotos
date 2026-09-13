@@ -14,7 +14,8 @@ sobre el skeleton oficial. Sin iframe, sin tokens propios: usa la **sesión del 
   de carpeta** de la propia app (se recuerda por navegador en localStorage) o con
   `ocphotos.config.rootPath` en `apps.yaml`. Si la raíz no existe, escanea todo el
   espacio personal y lo avisa con un banner.
-- Caché de la lista en localStorage (6 h) + botón de rescan.
+- Caché de la lista en localStorage (6 h). Al abrir, muestra la caché al instante
+  y refresca en segundo plano; las cachés vacías se ignoran. Botón de rescan.
 - Registrada en el **conmutador de aplicaciones** (appMenuItem).
 
 Limitaciones conocidas de esta etapa (resueltas por el photos-service en Etapa 2):
