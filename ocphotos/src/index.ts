@@ -74,6 +74,24 @@ export default defineWebApplication({
         }
       },
       {
+        path: '/tags',
+        name: 'photos-tags',
+        component: () => import('./views/TagsView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Tags')
+        }
+      },
+      {
+        path: '/folders',
+        name: 'photos-folders',
+        component: () => import('./views/FoldersView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Folders')
+        }
+      },
+      {
         path: '/map',
         name: 'photos-map',
         component: () => import('./views/MapView.vue'),
@@ -124,6 +142,18 @@ export default defineWebApplication({
         icon: 'map-pin',
         route: { path: `/${appInfo.id}/places` },
         priority: 40
+      },
+      {
+        name: $gettext('Tags'),
+        icon: 'price-tag-3',
+        route: { path: `/${appInfo.id}/tags` },
+        priority: 42
+      },
+      {
+        name: $gettext('Folders'),
+        icon: 'folder',
+        route: { path: `/${appInfo.id}/folders` },
+        priority: 44
       },
       {
         name: $gettext('Map'),

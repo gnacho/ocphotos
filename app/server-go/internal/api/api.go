@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/memories/highlights", s.highlights)
 	mux.HandleFunc("GET /api/geo", s.geoHandler)
 	mux.HandleFunc("GET /api/places", s.places)
+	mux.HandleFunc("GET /api/tags", s.listTags)
+	mux.HandleFunc("GET /api/tags/{tag}/assets", s.tagAssets)
+	mux.HandleFunc("GET /api/assets/{id}/tags", s.assetTags)
+	mux.HandleFunc("POST /api/assets/{id}/tags", s.addTag)
+	mux.HandleFunc("DELETE /api/assets/{id}/tags/{tag}", s.removeTag)
+	mux.HandleFunc("GET /api/folders", s.folders)
 	mux.HandleFunc("GET /api/albums", s.listAlbums)
 	mux.HandleFunc("POST /api/albums", s.createAlbum)
 	mux.HandleFunc("PATCH /api/albums/{id}", s.renameAlbum)
@@ -371,6 +378,93 @@ func (s *Server) places(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, map[string]any{"places": clusters})
+}
+
+// --- Etiquetas ---
+
+func (s *Server) listTags(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.st.ListTags(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"tags": tags})
+}
+
+func (s *Server) tagAssets(w http.ResponseWriter, r *http.Request) {
+	tag := r.PathValue("tag")
+	list, err := s.st.AssetsByTag(r.Context(), tag)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"assets": list})
+}
+
+func (s *Server) assetTags(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	tags, err := s.st.AssetTags(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"tags": tags})
+}
+
+func (s *Server) addTag(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	var body struct {
+		Tag string `json:"tag"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Tag) == "" {
+		http.Error(w, "tag required", 400)
+		return
+	}
+	if err := s.st.AddTag(r.Context(), id, strings.TrimSpace(body.Tag)); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) removeTag(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err := s.st.RemoveTag(r.Context(), id, r.PathValue("tag")); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Carpetas ---
+
+// folders: subcarpetas y fotos de una carpeta (derivado del índice).
+// path = ruta relativa dentro del espacio ("" = raíz).
+func (s *Server) folders(w http.ResponseWriter, r *http.Request) {
+	prefix := ""
+	if u, err := url.Parse(s.webdavURL); err == nil {
+		prefix = strings.TrimRight(u.Path, "/")
+	}
+	rel := strings.Trim(r.URL.Query().Get("path"), "/")
+	base := prefix + "/"
+	if rel != "" {
+		base += rel + "/"
+	}
+
+	folders, err := s.st.Subfolders(r.Context(), base)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	assets, err := s.st.FolderAssets(r.Context(), base)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	for i := range folders {
+		folders[i].Path = strings.TrimPrefix(base+folders[i].Name, prefix+"/")
+	}
+	writeJSON(w, map[string]any{"path": rel, "folders": folders, "assets": assets})
 }
 
 // --- Álbumes ---

@@ -3,7 +3,7 @@
     <div class="photos-toolbar">
       <h1 class="photos-title" v-text="$gettext('Photos')" />
       <span v-if="loading" class="photos-progress" v-text="$gettext('Loading…')" />
-      <span v-else class="photos-count" v-text="$gettext('%{n} items', { n: photos.length })" />
+      <span v-else class="photos-count" v-text="countLabel" />
       <oc-button appearance="raw" :aria-label="$gettext('Rescan')" @click="rescan">
         <oc-icon name="refresh" size="small" />
       </oc-button>
@@ -117,8 +117,15 @@ export default defineComponent({
       }
       return [...byYear.entries()]
         .sort(([a], [b]) => b - a)
-        .map(([year, photo]) => ({ year, photo, label: $gettext('%{n} years ago', { n: currentYear - year }) }))
+        .map(([year, photo]) => {
+          const n = currentYear - year
+          return { year, photo, label: $gettext(n === 1 ? '%{n} year ago' : '%{n} years ago', { n }) }
+        })
     })
+
+    const countLabel = computed(
+      () => `${photos.value.length} ${$gettext(photos.value.length === 1 ? 'item' : 'items')}`
+    )
     const jumpToPhoto = (p: Photo): void => {
       void jumpTo(p.takenAt)
     }
@@ -195,7 +202,7 @@ export default defineComponent({
     })
 
     return {
-      photos, loading, error, months, years, topYear, startAt, sentinel, onThisDay, otdTitle, jumpToPhoto, albumFor,
+      photos, loading, error, months, years, topYear, startAt, sentinel, onThisDay, otdTitle, jumpToPhoto, albumFor, countLabel,
       viewerList, viewerIndex, openViewer, formatDay, onImgError, jumpTo, jumpToYear,
       rescan, thumbSrc, ensurePreview, ensureOriginal
     }

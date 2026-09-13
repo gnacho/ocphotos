@@ -3,13 +3,13 @@
     <div class="albums-toolbar">
       <template v-if="!selected">
         <h1 v-text="$gettext('Albums')" />
-        <span class="albums-count" v-text="$gettext('%{n} albums', { n: albums.length })" />
+        <span class="albums-count" v-text="albumsLabel" />
         <button class="albums-btn" @click="startCreate" v-text="$gettext('New album')" />
       </template>
       <template v-else>
         <button class="albums-icon-btn" :aria-label="$gettext('Back')" @click="closeAlbum">‹</button>
         <h1 v-text="selected.name" />
-        <span class="albums-count" v-text="$gettext('%{n} items', { n: selectedAssets.length })" />
+        <span class="albums-count" v-text="itemsLabel" />
         <button class="albums-btn" @click="startRename" v-text="$gettext('Rename')" />
         <button class="albums-btn" @click="doDelete" v-text="$gettext('Delete')" />
       </template>
@@ -59,7 +59,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref } from 'vue'
+import { computed, defineComponent, onMounted, ref } from 'vue'
+import { useGettext } from 'vue3-gettext'
 import { usePhotoLibrary, Album, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
@@ -67,8 +68,12 @@ export default defineComponent({
   name: 'AlbumsView',
   components: { ViewerOverlay },
   setup() {
+    const { $gettext } = useGettext()
     const { fetchAlbums, createAlbum, renameAlbum, deleteAlbum, albumAssets, removeFromAlbum, ensurePreview, ensureOriginal, previews } =
       usePhotoLibrary()
+
+    const albumsLabel = computed(() => `${albums.value.length} ${$gettext(albums.value.length === 1 ? 'album' : 'albums')}`)
+    const itemsLabel = computed(() => `${selectedAssets.value.length} ${$gettext(selectedAssets.value.length === 1 ? 'item' : 'items')}`)
 
     const albums = ref<Album[]>([])
     const loading = ref(true)
@@ -155,7 +160,7 @@ export default defineComponent({
     onMounted(load)
 
     return {
-      albums, loading, selected, selectedAssets, dialog, dialogName,
+      albums, albumsLabel, itemsLabel, loading, selected, selectedAssets, dialog, dialogName,
       viewerList, viewerIndex, thumbSrc, coverSrc,
       openAlbum, closeAlbum, startCreate, startRename, confirmDialog, doDelete, remove, openPhoto, onImgError,
       ensurePreview, ensureOriginal

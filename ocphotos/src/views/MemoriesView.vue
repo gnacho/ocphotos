@@ -12,7 +12,7 @@
         <button class="memories-hero" @click="openViewer(list, 0)">
           <img :src="thumbSrc(list[0], 800)" :alt="String(year)" />
           <span class="memories-hero-label">
-            {{ $gettext('%{n} years ago', { n: currentYear - year }) }} · {{ list.length }}
+            {{ yearsAgo(currentYear - year) }} · {{ list.length }}
           </span>
         </button>
         <div class="memories-strip">
@@ -37,6 +37,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { useGettext } from 'vue3-gettext'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
@@ -44,7 +45,9 @@ export default defineComponent({
   name: 'MemoriesView',
   components: { ViewerOverlay },
   setup() {
+    const { $gettext } = useGettext()
     const { fetchOnThisDay, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
+    const yearsAgo = (n: number) => $gettext(n === 1 ? '%{n} year ago' : '%{n} years ago', { n })
     const loading = ref(true)
     const photos = ref<Photo[]>([])
     const currentYear = new Date().getFullYear()
@@ -84,7 +87,7 @@ export default defineComponent({
       }
     })
 
-    return { loading, years, currentYear, viewerList, viewerIndex, openViewer, thumbSrc, ensurePreview, ensureOriginal }
+    return { loading, years, currentYear, yearsAgo, viewerList, viewerIndex, openViewer, thumbSrc, ensurePreview, ensureOriginal }
   }
 })
 </script>

@@ -18,6 +18,9 @@
         <button v-if="current" class="viewer-btn" :aria-label="$gettext('Add to album')" @click="pickerOpen = true">
           <oc-icon name="album" color="#fff" size="medium" />
         </button>
+        <button v-if="current" class="viewer-btn" :class="{ 'is-fav': tagsOpen }" :aria-label="$gettext('Add tag')" @click="toggleTags">
+          <oc-icon name="price-tag-3" color="#fff" size="medium" />
+        </button>
         <button class="viewer-btn" :aria-label="$gettext('Download')" @click="download">
           <oc-icon name="file-download" color="#fff" size="medium" />
         </button>
@@ -34,6 +37,16 @@
       <span v-else-if="current" class="viewer-loading" v-text="$gettext('Loading…')" />
     </div>
     <button v-if="index < photos.length - 1" class="viewer-arrow right" @click="$emit('navigate', index + 1)">›</button>
+
+    <div v-if="tagsOpen && current" class="viewer-tags">
+      <span v-for="t in tags" :key="t" class="viewer-tag">
+        <span v-text="t" />
+        <button class="viewer-tag-x" :aria-label="$gettext('Remove')" @click="dropTag(t)">×</button>
+      </span>
+      <form @submit.prevent="submitTag">
+        <input v-model="newTag" class="viewer-tag-input" :placeholder="$gettext('New tag…')" />
+      </form>
+    </div>
 
     <album-picker v-if="pickerOpen && current" :asset-id="current.id" @close="pickerOpen = false" />
   </div>
@@ -62,11 +75,36 @@ export default defineComponent({
   },
   emits: ['close', 'navigate'],
   setup(props, { emit }) {
-    const { toggleFavorite } = usePhotoLibrary()
+    const { toggleFavorite, assetTags, addTag, removeTag } = usePhotoLibrary()
     const root = ref<HTMLElement | null>(null)
     const src = ref('')
     const pickerOpen = ref(false)
+    const tagsOpen = ref(false)
+    const tags = ref<string[]>([])
+    const newTag = ref('')
+
     const current = computed(() => props.photos[props.index])
+
+    const loadTags = async () => {
+      if (!current.value) return
+      tags.value = await assetTags(current.value.id)
+    }
+    const toggleTags = async () => {
+      tagsOpen.value = !tagsOpen.value
+      if (tagsOpen.value) await loadTags()
+    }
+    const submitTag = async () => {
+      const t = newTag.value.trim()
+      if (!t || !current.value) return
+      await addTag(current.value.id, t)
+      newTag.value = ''
+      await loadTags()
+    }
+    const dropTag = async (t: string) => {
+      if (!current.value) return
+      await removeTag(current.value.id, t)
+      await loadTags()
+    }
 
     const caption = computed(() => {
       const p = current.value
@@ -115,7 +153,7 @@ export default defineComponent({
     }
     onMounted(() => window.addEventListener('keydown', onKey))
     onUnmounted(() => window.removeEventListener('keydown', onKey))
-    return { root, current, src, caption, download, onFavorite, pickerOpen }
+    return { root, current, src, caption, download, onFavorite, pickerOpen, tagsOpen, tags, newTag, toggleTags, submitTag, dropTag }
   }
 })
 </script>
@@ -142,6 +180,19 @@ export default defineComponent({
 .viewer-btn.is-fav { background: rgba(224, 49, 49, 0.75); }
 .viewer-close { background: rgba(255, 255, 255, 0.2); }
 .viewer-close:hover { background: rgba(255, 255, 255, 0.34); }
+.viewer-tags {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.viewer-tag {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16); color: #fff; font-size: 0.82rem;
+}
+.viewer-tag-x { border: 0; background: none; color: #fff; cursor: pointer; font-size: 1rem; line-height: 1; }
+.viewer-tag-input {
+  padding: 5px 10px; border-radius: 8px; font-size: 0.85rem; min-width: 160px;
+  border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.4); color: #fff;
+}
 .viewer-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 8px 8px; }
 .viewer-media { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
 .viewer-loading { color: #aaa; font-size: 0.85rem; }

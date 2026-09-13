@@ -3,12 +3,12 @@
     <div class="places-toolbar">
       <template v-if="!selected">
         <h1 v-text="$gettext('Places')" />
-        <span class="places-count" v-text="$gettext('%{n} places', { n: places.length })" />
+        <span class="places-count" v-text="placesLabel" />
       </template>
       <template v-else>
         <button class="places-icon-btn" :aria-label="$gettext('Back')" @click="closePlace">‹</button>
         <h1 v-text="selected.name || coords(selected)" />
-        <span class="places-count" v-text="$gettext('%{n} items', { n: selectedAssets.length })" />
+        <span class="places-count" v-text="itemsLabel" />
       </template>
     </div>
 
@@ -46,7 +46,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref } from 'vue'
+import { computed, defineComponent, onMounted, ref } from 'vue'
+import { useGettext } from 'vue3-gettext'
 import { usePhotoLibrary, Place, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
@@ -54,7 +55,11 @@ export default defineComponent({
   name: 'PlacesView',
   components: { ViewerOverlay },
   setup() {
+    const { $gettext } = useGettext()
     const { fetchPlaces, placeAssets, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
+
+    const placesLabel = computed(() => `${places.value.length} ${$gettext(places.value.length === 1 ? 'place' : 'places')}`)
+    const itemsLabel = computed(() => `${selectedAssets.value.length} ${$gettext(selectedAssets.value.length === 1 ? 'item' : 'items')}`)
 
     const places = ref<Place[]>([])
     const loading = ref(true)
@@ -102,7 +107,7 @@ export default defineComponent({
     onMounted(load)
 
     return {
-      places, loading, selected, selectedAssets, viewerList, viewerIndex,
+      places, placesLabel, itemsLabel, loading, selected, selectedAssets, viewerList, viewerIndex,
       thumbSrc, coverSrc, coords, openPlace, closePlace, openPhoto, onImgError,
       ensurePreview, ensureOriginal
     }

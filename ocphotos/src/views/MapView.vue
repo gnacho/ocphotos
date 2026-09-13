@@ -2,7 +2,7 @@
   <div class="map-view">
     <div class="map-toolbar">
       <h1 v-text="$gettext('Map')" />
-      <span class="map-count" v-text="$gettext('%{n} places', { n: places.length })" />
+      <span class="map-count" v-text="placesLabel" />
     </div>
 
     <div v-if="loading" class="map-note" v-text="$gettext('Loading…')" />
@@ -22,7 +22,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useGettext } from 'vue3-gettext'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { usePhotoLibrary, Place, Photo } from '../composables/usePhotoLibrary'
@@ -32,7 +33,9 @@ export default defineComponent({
   name: 'MapView',
   components: { ViewerOverlay },
   setup() {
+    const { $gettext } = useGettext()
     const { fetchPlaces, placeAssets, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
+    const placesLabel = computed(() => `${places.value.length} ${$gettext(places.value.length === 1 ? 'place' : 'places')}`)
     const loading = ref(true)
     const places = ref<Place[]>([])
     const mapEl = ref<HTMLElement | null>(null)
@@ -94,7 +97,7 @@ export default defineComponent({
       map = null
     })
 
-    return { loading, places, mapEl, viewerList, viewerIndex, ensurePreview, ensureOriginal }
+    return { loading, places, placesLabel, mapEl, viewerList, viewerIndex, ensurePreview, ensureOriginal }
   }
 })
 </script>

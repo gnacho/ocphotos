@@ -61,6 +61,13 @@ CREATE TABLE IF NOT EXISTS album_assets (
 );
 CREATE INDEX IF NOT EXISTS album_assets_asset ON album_assets (asset_id);
 
+CREATE TABLE IF NOT EXISTS asset_tags (
+    asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    tag      TEXT NOT NULL,
+    PRIMARY KEY (asset_id, tag)
+);
+CREATE INDEX IF NOT EXISTS asset_tags_tag ON asset_tags (tag);
+
 -- caché de geocodificación inversa (Lugares): clave = coords redondeadas
 CREATE TABLE IF NOT EXISTS geocode (
     lat_key REAL NOT NULL,
@@ -509,6 +516,130 @@ func (s *Store) PlaceClusters(ctx context.Context, decimals int) ([]Place, error
 			 ORDER BY taken_at DESC LIMIT 1`, decimals, out[i].Lat, decimals, out[i].Lon).Scan(&out[i].CoverID)
 	}
 	return out, nil
+}
+
+// --- Etiquetas ---
+
+type Tag struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+func (s *Store) AddTag(ctx context.Context, assetID int64, tag string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO asset_tags (asset_id, tag) VALUES (?,?)`, assetID, tag)
+	return err
+}
+
+func (s *Store) RemoveTag(ctx context.Context, assetID int64, tag string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM asset_tags WHERE asset_id=? AND tag=?`, assetID, tag)
+	return err
+}
+
+func (s *Store) AssetTags(ctx context.Context, assetID int64) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT tag FROM asset_tags WHERE asset_id=? ORDER BY tag COLLATE NOCASE`, assetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// ListTags: etiquetas con recuento de fotos vivas.
+func (s *Store) ListTags(ctx context.Context) ([]Tag, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT t.tag, count(*) FROM asset_tags t JOIN assets a ON a.id=t.asset_id
+		WHERE a.deleted_at IS NULL GROUP BY t.tag ORDER BY t.tag COLLATE NOCASE`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Tag{}
+	for rows.Next() {
+		var tg Tag
+		if err := rows.Scan(&tg.Name, &tg.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, tg)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) AssetsByTag(ctx context.Context, tag string) ([]Asset, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+assetCols+` FROM assets
+		WHERE deleted_at IS NULL AND id IN (SELECT asset_id FROM asset_tags WHERE tag=?)
+		ORDER BY taken_at DESC`, tag)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Asset{}
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// --- Carpetas (derivadas del índice; base = prefijo DAV del espacio + ruta) ---
+
+type FolderEntry struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	Count int    `json:"count"`
+}
+
+// Subfolders: subcarpetas directas bajo `base` (con recuento de fotos, recursivo).
+func (s *Store) Subfolders(ctx context.Context, base string) ([]FolderEntry, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT substr(path, ?+1, instr(substr(path, ?+1), '/')-1) AS name, count(*)
+		FROM assets
+		WHERE deleted_at IS NULL AND path LIKE ? || '%' AND instr(substr(path, ?+1), '/') > 0
+		GROUP BY name ORDER BY name COLLATE NOCASE`,
+		len(base), len(base), base, len(base))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []FolderEntry{}
+	for rows.Next() {
+		var fe FolderEntry
+		if err := rows.Scan(&fe.Name, &fe.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, fe)
+	}
+	return out, rows.Err()
+}
+
+// FolderAssets: fotos directamente en `base` (sin bajar a subcarpetas).
+func (s *Store) FolderAssets(ctx context.Context, base string) ([]Asset, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+assetCols+` FROM assets
+		WHERE deleted_at IS NULL AND path LIKE ? || '%' AND path NOT LIKE ? || '%/%'
+		ORDER BY taken_at DESC`, base, base)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Asset{}
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
 }
 
 // --- caché de geocodificación (Lugares) ---

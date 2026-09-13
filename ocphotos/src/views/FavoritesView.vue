@@ -2,7 +2,7 @@
   <div class="fav-view">
     <div class="fav-toolbar">
       <h1 v-text="$gettext('Favorites')" />
-      <span class="fav-count" v-text="$gettext('%{n} items', { n: photos.length })" />
+      <span class="fav-count" v-text="itemsLabel" />
     </div>
 
     <div v-if="loading" class="fav-note" v-text="$gettext('Loading…')" />
@@ -30,7 +30,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { useGettext } from 'vue3-gettext'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
@@ -38,7 +39,9 @@ export default defineComponent({
   name: 'FavoritesView',
   components: { ViewerOverlay },
   setup() {
+    const { $gettext } = useGettext()
     const { fetchFavorites, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
+    const itemsLabel = computed(() => `${photos.value.length} ${$gettext(photos.value.length === 1 ? 'item' : 'items')}`)
     const loading = ref(true)
     const photos = ref<Photo[]>([])
     const viewerList = ref<Photo[] | null>(null)
@@ -73,7 +76,7 @@ export default defineComponent({
       }
     })
 
-    return { loading, photos, viewerList, viewerIndex, openViewer, thumbSrc, onImgError, ensurePreview, ensureOriginal }
+    return { loading, photos, itemsLabel, viewerList, viewerIndex, openViewer, thumbSrc, onImgError, ensurePreview, ensureOriginal }
   }
 })
 </script>

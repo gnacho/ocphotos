@@ -49,6 +49,23 @@ export interface Place {
   name?: string
 }
 
+export interface Tag {
+  name: string
+  count: number
+}
+
+export interface FolderEntry {
+  name: string
+  path: string
+  count: number
+}
+
+export interface FolderListing {
+  path: string
+  folders: FolderEntry[]
+  assets: Photo[]
+}
+
 interface ApiAsset {
   id: number
   path: string
@@ -343,6 +360,44 @@ export function usePhotoLibrary() {
     await api(`/api/albums/${albumId}/assets/${assetId}`, { method: 'DELETE' })
   }
 
+  // --- Etiquetas ---
+  const fetchTags = async (): Promise<Tag[]> => {
+    const res = await api('/api/tags')
+    const json = (await res.json()) as { tags?: Tag[] }
+    return json.tags ?? []
+  }
+
+  const tagAssets = async (tag: string): Promise<Photo[]> => {
+    const res = await api(`/api/tags/${encodeURIComponent(tag)}/assets`)
+    const json = (await res.json()) as { assets?: ApiAsset[] }
+    return (json.assets ?? []).map(toPhoto)
+  }
+
+  const assetTags = async (id: number): Promise<string[]> => {
+    const res = await api(`/api/assets/${id}/tags`)
+    const json = (await res.json()) as { tags?: string[] }
+    return json.tags ?? []
+  }
+
+  const addTag = async (id: number, tag: string): Promise<void> => {
+    await api(`/api/assets/${id}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag })
+    })
+  }
+
+  const removeTag = async (id: number, tag: string): Promise<void> => {
+    await api(`/api/assets/${id}/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' })
+  }
+
+  // --- Carpetas ---
+  const fetchFolder = async (path = ''): Promise<FolderListing> => {
+    const res = await api(`/api/folders?path=${encodeURIComponent(path)}`)
+    const json = (await res.json()) as { path?: string; folders?: FolderEntry[]; assets?: ApiAsset[] }
+    return { path: json.path ?? '', folders: json.folders ?? [], assets: (json.assets ?? []).map(toPhoto) }
+  }
+
   // --- Lugares ---
   const fetchPlaces = async (): Promise<Place[]> => {
     const res = await api('/api/places')
@@ -408,6 +463,12 @@ export function usePhotoLibrary() {
     removeFromAlbum,
     fetchPlaces,
     placeAssets,
+    fetchTags,
+    tagAssets,
+    assetTags,
+    addTag,
+    removeTag,
+    fetchFolder,
     searchAssets,
     previews
   }
