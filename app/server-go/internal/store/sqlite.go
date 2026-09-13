@@ -96,6 +96,7 @@ type Asset struct {
 	Lon        *float64   `json:"lon,omitempty"`
 	Size       int64      `json:"size"`
 	IsFavorite bool       `json:"favorite"`
+	IsArchived bool       `json:"archived"`
 	ExifDone   bool       `json:"-"`
 	DeletedAt  *int64     `json:"-"`
 }
@@ -117,6 +118,15 @@ func Open(path string) (*Store, error) {
 	db.SetMaxOpenConns(1) // SQLite: un writer; WAL permite readers concurrentes en conns separadas, pero con database/sql simplificamos a 1
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("schema: %w", err)
+	}
+	// migraciones idempotentes (ADD COLUMN no soporta IF NOT EXISTS en SQLite)
+	for _, m := range []string{
+		`ALTER TABLE assets ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE assets ADD COLUMN phash TEXT`,
+	} {
+		if _, err := db.Exec(m); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return nil, fmt.Errorf("migración %q: %w", m, err)
+		}
 	}
 	return &Store{db: db}, nil
 }
@@ -227,20 +237,21 @@ func (s *Store) SaveExif(ctx context.Context, id int64, r ExifResult) error {
 
 // --- lectura (API) ---
 
-const assetCols = `id, path, filename, media_type, taken_at, width, height, camera, lens, iso, aperture, shutter, focal, lat, lon, size, is_favorite, exif_done, deleted_at`
+const assetCols = `id, path, filename, media_type, taken_at, width, height, camera, lens, iso, aperture, shutter, focal, lat, lon, size, is_favorite, is_archived, exif_done, deleted_at`
 
 func scanAsset(rows interface{ Scan(...any) error }) (Asset, error) {
 	var a Asset
-	var fav, exif int
+	var fav, arch, exif int
 	var lat, lon *float64
 	var camera, lens, aperture, shutter, focal *string
 	var iso, width, height *int
 	err := rows.Scan(&a.ID, &a.Path, &a.Filename, &a.MediaType, &a.TakenAt, &width, &height,
-		&camera, &lens, &iso, &aperture, &shutter, &focal, &lat, &lon, &a.Size, &fav, &exif, &a.DeletedAt)
+		&camera, &lens, &iso, &aperture, &shutter, &focal, &lat, &lon, &a.Size, &fav, &arch, &exif, &a.DeletedAt)
 	if err != nil {
 		return a, err
 	}
 	a.IsFavorite = fav == 1
+	a.IsArchived = arch == 1
 	a.ExifDone = exif == 1
 	a.Lat, a.Lon = lat, lon
 	if camera != nil { a.Camera = *camera }
@@ -255,9 +266,13 @@ func scanAsset(rows interface{ Scan(...any) error }) (Asset, error) {
 }
 
 // AssetsPage pagina por cursor (taken_at, id) descendente — scroll infinito estable.
-func (s *Store) AssetsPage(ctx context.Context, beforeTaken int64, beforeID int64, limit int, favoritesOnly bool, query string) ([]Asset, error) {
-	q := `SELECT ` + assetCols + ` FROM assets WHERE deleted_at IS NULL AND (taken_at < ? OR (taken_at = ? AND id < ?))`
-	args := []any{beforeTaken, beforeTaken, beforeID}
+func (s *Store) AssetsPage(ctx context.Context, beforeTaken int64, beforeID int64, limit int, favoritesOnly, archivedOnly bool, query string) ([]Asset, error) {
+	arch := 0
+	if archivedOnly {
+		arch = 1
+	}
+	q := `SELECT ` + assetCols + ` FROM assets WHERE deleted_at IS NULL AND is_archived = ? AND (taken_at < ? OR (taken_at = ? AND id < ?))`
+	args := []any{arch, beforeTaken, beforeTaken, beforeID}
 	if favoritesOnly {
 		q += ` AND is_favorite = 1`
 	}
@@ -296,6 +311,60 @@ func (s *Store) SetFavorite(ctx context.Context, id int64, fav bool) error {
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE assets SET is_favorite=? WHERE id=?`, v, id)
 	return err
+}
+
+func (s *Store) SetArchived(ctx context.Context, id int64, arch bool) error {
+	v := 0
+	if arch {
+		v = 1
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE assets SET is_archived=? WHERE id=?`, v, id)
+	return err
+}
+
+// SetPHash guarda el hash perceptual (hex) de una foto.
+func (s *Store) SetPHash(ctx context.Context, id int64, hash string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE assets SET phash=? WHERE id=?`, hash, id)
+	return err
+}
+
+// AssetsWithoutPHash: fotos vivas sin hash perceptual (para calcularlo).
+func (s *Store) AssetsWithoutPHash(ctx context.Context, limit int) ([]Asset, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+assetCols+` FROM assets
+		WHERE deleted_at IS NULL AND (phash IS NULL OR phash='') LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Asset{}
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// AllPHashes: id -> hash perceptual de las fotos vivas que ya lo tienen.
+func (s *Store) AllPHashes(ctx context.Context) (map[int64]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, phash FROM assets
+		WHERE deleted_at IS NULL AND phash IS NOT NULL AND phash <> ''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var h string
+		if err := rows.Scan(&id, &h); err != nil {
+			return nil, err
+		}
+		out[id] = h
+	}
+	return out, rows.Err()
 }
 
 // OnThisDay: fotos de este mes-día (o ±dayRange días) en años anteriores.
@@ -680,28 +749,48 @@ func (s *Store) GeoAssets(ctx context.Context, limit int) ([]Asset, error) {
 	return out, rows.Err()
 }
 
-// YearCount: fotos por año de captura (para el scrubber "Rewind").
-type YearCount struct {
-	Year  int   `json:"year"`
+// MonthCount: fotos de un mes (1-12) del año.
+type MonthCount struct {
+	Month int   `json:"month"`
 	Count int64 `json:"count"`
 }
 
-// Calendar devuelve los años con fotos y su recuento, descendente.
+// YearCount: fotos por año de captura, con desglose por mes (scrubber "Rewind").
+type YearCount struct {
+	Year   int          `json:"year"`
+	Count  int64        `json:"count"`
+	Months []MonthCount `json:"months"`
+}
+
+// Calendar devuelve los años (y meses) con fotos, descendente. Excluye archivadas.
 func (s *Store) Calendar(ctx context.Context) ([]YearCount, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT CAST(strftime('%Y', taken_at, 'unixepoch') AS INT) AS y, count(*)
-		 FROM assets WHERE deleted_at IS NULL GROUP BY y ORDER BY y DESC`)
+		`SELECT CAST(strftime('%Y', taken_at, 'unixepoch') AS INT) AS y,
+		        CAST(strftime('%m', taken_at, 'unixepoch') AS INT) AS m, count(*)
+		 FROM assets WHERE deleted_at IS NULL AND is_archived = 0
+		 GROUP BY y, m ORDER BY y DESC, m DESC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []YearCount{}
+	byYear := map[int]*YearCount{}
+	order := []int{}
 	for rows.Next() {
-		var yc YearCount
-		if err := rows.Scan(&yc.Year, &yc.Count); err != nil {
+		var y, m int
+		var c int64
+		if err := rows.Scan(&y, &m, &c); err != nil {
 			return nil, err
 		}
-		out = append(out, yc)
+		if byYear[y] == nil {
+			byYear[y] = &YearCount{Year: y, Months: []MonthCount{}}
+			order = append(order, y)
+		}
+		byYear[y].Count += c
+		byYear[y].Months = append(byYear[y].Months, MonthCount{Month: m, Count: c})
+	}
+	out := []YearCount{}
+	for _, y := range order {
+		out = append(out, *byYear[y])
 	}
 	return out, rows.Err()
 }

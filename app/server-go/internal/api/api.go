@@ -6,10 +6,13 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"image"
+	_ "image/jpeg"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +20,7 @@ import (
 	"github.com/opencloud-memories/photos-service/internal/dav"
 	"github.com/opencloud-memories/photos-service/internal/geo"
 	"github.com/opencloud-memories/photos-service/internal/index"
+	"github.com/opencloud-memories/photos-service/internal/phash"
 	"github.com/opencloud-memories/photos-service/internal/store"
 	"github.com/opencloud-memories/photos-service/internal/thumb"
 )
@@ -51,6 +55,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/assets", s.assets)
 	mux.HandleFunc("GET /api/assets/{id}", s.asset)
 	mux.HandleFunc("POST /api/assets/{id}/favorite", s.favorite)
+	mux.HandleFunc("POST /api/assets/{id}/archive", s.archive)
+	mux.HandleFunc("GET /api/duplicates", s.duplicates)
 	mux.HandleFunc("GET /api/assets/{id}/thumb", s.thumbHandler)
 	mux.HandleFunc("GET /api/thumb", s.thumbByPath)
 	mux.HandleFunc("GET /api/assets/{id}/original", s.original)
@@ -208,7 +214,7 @@ func (s *Server) assets(w http.ResponseWriter, r *http.Request) {
 			limit = n
 		}
 	}
-	list, err := s.st.AssetsPage(r.Context(), beforeTaken, beforeID, limit, q.Get("favorites") == "1", q.Get("q"))
+	list, err := s.st.AssetsPage(r.Context(), beforeTaken, beforeID, limit, q.Get("favorites") == "1", q.Get("archived") == "1", q.Get("q"))
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -240,6 +246,74 @@ func (s *Server) favorite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) archive(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	var body struct {
+		Archived bool `json:"archived"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
+	if err := s.st.SetArchived(r.Context(), id, body.Archived); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// duplicates: calcula los hashes perceptuales que falten (acotado) y devuelve
+// los grupos de fotos casi iguales (distancia de Hamming <= 8).
+func (s *Server) duplicates(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	pending, err := s.st.AssetsWithoutPHash(ctx, 60)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	computed := 0
+	for _, a := range pending {
+		if err := s.computePHash(ctx, a); err == nil {
+			computed++
+		}
+	}
+	hashes, err := s.st.AllPHashes(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	groups := phash.Group(hashes, 8)
+	out := make([][]store.Asset, 0, len(groups))
+	for _, ids := range groups {
+		list := make([]store.Asset, 0, len(ids))
+		for _, id := range ids {
+			if a, err := s.st.AssetByID(ctx, id); err == nil {
+				list = append(list, a)
+			}
+		}
+		out = append(out, list)
+	}
+	writeJSON(w, map[string]any{"groups": out, "computed": computed, "pending": len(pending) - computed})
+}
+
+// computePHash: hash perceptual a partir de la miniatura en caché (no descarga el original).
+func (s *Server) computePHash(ctx context.Context, a store.Asset) error {
+	file, err := s.thumbs.Get(ctx, a.Path, etagFor(a), 400)
+	if err != nil {
+		return err
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	img, _, err := image.Decode(f)
+	if err != nil {
+		return err
+	}
+	return s.st.SetPHash(ctx, a.ID, phash.DHash(img))
 }
 
 func (s *Server) thumbHandler(w http.ResponseWriter, r *http.Request) {
