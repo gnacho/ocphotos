@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { useClientService, usePreviewService, useSpacesStore } from '@opencloud-eu/web-pkg'
+import { useAuthStore, useClientService, usePreviewService, useSpacesStore } from '@opencloud-eu/web-pkg'
 import type { ProcessorType } from '@opencloud-eu/web-pkg'
 import type { Resource, SpaceResource } from '@opencloud-eu/web-client'
 
@@ -81,10 +81,14 @@ const originals = ref<Record<string, string>>({})
 const previewKey = (p: Photo, size: number, processor: ProcessorType) => `${p.path}|${size}|${processor}`
 const originalKey = (p: Photo) => `${p.path}|original`
 
+// base del photos-service (mismo origen, vía NPM); decodifica HEIC/HEIF en servidor
+const SERVICE_BASE = '/ocphotos-api'
+
 export function usePhotoLibrary() {
   const clientService = useClientService()
   const previewService = usePreviewService()
   const spacesStore = useSpacesStore()
+  const authStore = useAuthStore()
 
   const personalSpace = computed<SpaceResource | null>(() => {
     if (state.space.value) return state.space.value
@@ -258,7 +262,27 @@ export function usePhotoLibrary() {
       hasPreview: () => !p.isVideo
     }) as unknown as Resource
 
-  /** Pide (y cachea) una preview autenticada al servidor; devuelve un blob URL. */
+  /** Miniatura generada por el photos-service (decodifica HEIC/HEIF en servidor). */
+  const servicePreview = async (p: Photo, size: number): Promise<string> => {
+    const token = authStore.accessToken
+    if (!token) return ''
+    try {
+      const q = new URLSearchParams({ path: p.path, w: String(size) })
+      if (p.etag) q.set('etag', p.etag)
+      const res = await fetch(`${SERVICE_BASE}/api/thumb?${q.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) return ''
+      const blob = await res.blob()
+      if (!blob.size) return ''
+      return URL.createObjectURL(blob)
+    } catch {
+      return ''
+    }
+  }
+
+  /** Pide (y cachea) una preview autenticada al servidor; devuelve un blob URL.
+   *  Si el host no sabe previsualizar el formato (HEIC), cae al photos-service. */
   const ensurePreview = async (p: Photo, size = 400, processor: ProcessorType = 'thumbnail'): Promise<string> => {
     const key = previewKey(p, size, processor)
     if (previews.value[key]) return previews.value[key]
@@ -271,11 +295,16 @@ export function usePhotoLibrary() {
         dimensions: [size, size],
         processor
       })
-      if (url) previews.value[key] = url
-      return url ?? ''
+      if (url) {
+        previews.value[key] = url
+        return url
+      }
     } catch {
-      return ''
+      // formato no soportado por el host (HEIC/HEIF/RAW): probamos el servicio
     }
+    const url = await servicePreview(p, size)
+    if (url) previews.value[key] = url
+    return url
   }
 
   /** Descarga el fichero original con la sesión del host; devuelve un blob URL. */

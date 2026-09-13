@@ -27,15 +27,16 @@ type Server struct {
 	webdavURL string
 	scanRoot  string
 	ocBaseURL string
+	ocUserID  string
 	token     string
 	log       *slog.Logger
 	rescanCh  chan struct{}
 }
 
-func New(st *store.Store, th *thumb.Service, dc *dav.Client, sc *index.Scanner, webdavURL, scanRoot, ocBaseURL, token string, log *slog.Logger) *Server {
+func New(st *store.Store, th *thumb.Service, dc *dav.Client, sc *index.Scanner, webdavURL, scanRoot, ocBaseURL, ocUserID, token string, log *slog.Logger) *Server {
 	return &Server{
 		st: st, thumbs: th, dav: dc, scanner: sc,
-		webdavURL: webdavURL, scanRoot: scanRoot, ocBaseURL: ocBaseURL, token: token, log: log,
+		webdavURL: webdavURL, scanRoot: scanRoot, ocBaseURL: ocBaseURL, ocUserID: ocUserID, token: token, log: log,
 		rescanCh: make(chan struct{}, 1),
 	}
 }
@@ -99,8 +100,23 @@ func (s *Server) validOpenCloudSession(r *http.Request) bool {
 		return false
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
-	return resp.StatusCode == http.StatusOK
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		return false
+	}
+	// single-tenant: solo la sesión del usuario configurado (evita que otros
+	// usuarios de la instancia reciban miniaturas de su espacio)
+	if s.ocUserID == "" {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		return true
+	}
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return false
+	}
+	return out.ID == s.ocUserID
 }
 
 // thumbByPath genera una miniatura a partir de la ruta del fichero (sin índice),

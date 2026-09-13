@@ -81,6 +81,15 @@ func main() {
 
 	dc := dav.New(cfg.ocBaseURL, cfg.ocUser, cfg.ocAppToken)
 
+	// identidad del usuario configurado: el servicio es single-tenant y solo
+	// atiende a su sesión (rechaza a otros usuarios de la instancia)
+	meID, err := dc.MeID(ctx)
+	if err != nil {
+		log.Warn("no se pudo resolver el id del usuario (se omite la comprobación de sesión)", "err", err)
+	} else {
+		log.Info("usuario del servicio", "id", meID)
+	}
+
 	// descubrir el espacio personal y su webDavUrl
 	drives, err := dc.ListDrives(ctx)
 	if err != nil {
@@ -111,7 +120,7 @@ func main() {
 
 	scanner := index.NewScanner(dc, st, log)
 	exifWorker := exif.NewWorker(dc, st, log)
-	apiSrv := api.New(st, thumbs, dc, scanner, webdavURL, cfg.scanRoot, cfg.ocBaseURL, cfg.token, log)
+	apiSrv := api.New(st, thumbs, dc, scanner, webdavURL, cfg.scanRoot, cfg.ocBaseURL, meID, cfg.token, log)
 
 	// scan + EXIF bajo demanda y programados
 	go func() {

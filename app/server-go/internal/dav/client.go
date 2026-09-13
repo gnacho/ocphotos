@@ -58,6 +58,28 @@ func (c *Client) FileURL(href string) string {
 	return c.base + href
 }
 
+// MeID devuelve el id del usuario configurado (Basic user:app-token). Sirve para
+// rechazar sesiones de otros usuarios: el servicio es single-tenant.
+func (c *Client) MeID(ctx context.Context) (string, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/graph/v1.0/me", nil)
+	req.SetBasicAuth(c.user, c.token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("graph /me: %s", resp.Status)
+	}
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	return out.ID, nil
+}
+
 // SpaceFileURL construye la URL interna de un fichero a partir del webDavUrl del
 // espacio y de su ruta relativa ("/Fotos/IMG.heic"), usando la base configurada
 // (permite que el servicio use 127.0.0.1 en vez de la URL pública).
