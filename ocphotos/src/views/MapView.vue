@@ -2,12 +2,12 @@
   <div class="map-view">
     <div class="map-toolbar">
       <h1 v-text="$gettext('Map')" />
-      <span class="map-count" v-text="$gettext('%{n} located', { n: photos.length })" />
+      <span class="map-count" v-text="$gettext('%{n} places', { n: places.length })" />
     </div>
 
     <div v-if="loading" class="map-note" v-text="$gettext('Loading…')" />
-    <div v-else-if="photos.length === 0" class="map-note" v-text="$gettext('No photos with location data')" />
-    <div v-show="photos.length > 0" ref="mapEl" class="map-canvas" />
+    <div v-else-if="places.length === 0" class="map-note" v-text="$gettext('No photos with location data')" />
+    <div v-show="places.length > 0" ref="mapEl" class="map-canvas" />
 
     <viewer-overlay
       v-if="viewerList"
@@ -25,25 +25,28 @@
 import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, Place, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
   name: 'MapView',
   components: { ViewerOverlay },
   setup() {
-    const { fetchGeo, ensurePreview, ensureOriginal } = usePhotoLibrary()
+    const { fetchPlaces, placeAssets, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
     const loading = ref(true)
-    const photos = ref<Photo[]>([])
+    const places = ref<Place[]>([])
     const mapEl = ref<HTMLElement | null>(null)
     let map: L.Map | null = null
 
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
 
+    const coverSrc = (id: number) => previews.value[`${id}|400`] ?? ''
+
     const render = async () => {
       await nextTick()
-      if (!mapEl.value || photos.value.length === 0) return
+      if (!mapEl.value || places.value.length === 0) return
+
       map = L.map(mapEl.value, { worldCopyJump: true })
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -51,31 +54,35 @@ export default defineComponent({
       }).addTo(map)
 
       const bounds = L.latLngBounds([])
-      photos.value.forEach((p, i) => {
-        if (p.lat == null || p.lon == null) return
-        const ll = L.latLng(p.lat, p.lon)
+      for (const pl of places.value) {
+        const ll = L.latLng(pl.lat, pl.lon)
         bounds.extend(ll)
-        L.circleMarker(ll, {
-          radius: 6,
-          color: '#00677f',
-          weight: 2,
-          fillColor: '#0ea5e9',
-          fillOpacity: 0.85
+
+        const src = coverSrc(pl.coverId)
+        const count = pl.count > 1 ? `<span class="map-pin-count">${pl.count}</span>` : ''
+        const html = `<div class="map-pin">${src ? `<img src="${src}" alt="" />` : ''}${count}</div>`
+
+        L.marker(ll, {
+          icon: L.divIcon({ className: 'map-pin-wrap', html, iconSize: [48, 48], iconAnchor: [24, 24] }),
+          title: pl.name || `${pl.lat.toFixed(2)}, ${pl.lon.toFixed(2)}`
         })
           .addTo(map!)
-          .on('click', () => {
-            viewerList.value = photos.value
-            viewerIndex.value = i
+          .on('click', async () => {
+            const list = await placeAssets(pl.lat, pl.lon)
+            if (!list.length) return
+            viewerList.value = list
+            viewerIndex.value = 0
           })
-          .bindTooltip(p.name)
-      })
-      if (bounds.isValid()) map.fitBounds(bounds, { maxZoom: 12, padding: [40, 40] })
+      }
+      if (bounds.isValid()) map.fitBounds(bounds, { maxZoom: 13, padding: [50, 50] })
       else map.setView([40.4, -3.7], 5)
     }
 
     onMounted(async () => {
       try {
-        photos.value = await fetchGeo()
+        places.value = await fetchPlaces()
+        // miniaturas de portada antes de pintar los marcadores
+        for (const pl of places.value) if (pl.coverId) await ensurePreview({ id: pl.coverId } as Photo, 400)
       } finally {
         loading.value = false
       }
@@ -87,7 +94,7 @@ export default defineComponent({
       map = null
     })
 
-    return { loading, photos, mapEl, viewerList, viewerIndex, ensurePreview, ensureOriginal }
+    return { loading, places, mapEl, viewerList, viewerIndex, ensurePreview, ensureOriginal }
   }
 })
 </script>
@@ -102,4 +109,21 @@ export default defineComponent({
 .map-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
 .map-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
 .map-canvas { flex: 1; min-height: 0; }
+</style>
+
+<!-- estilos de los marcadores (HTML creado por Leaflet: no lleva el scope) -->
+<style>
+.map-pin-wrap { background: none; border: 0; }
+.map-pin {
+  position: relative; width: 48px; height: 48px;
+  background-color: rgba(0, 0, 0, 0.3); border-radius: 5px;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+}
+.map-pin:hover { box-shadow: 0 0 3px var(--oc-role-primary, #00677f); }
+.map-pin img { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; cursor: pointer; display: block; }
+.map-pin-count {
+  position: absolute; right: -4px; bottom: -4px;
+  background-color: var(--oc-role-primary, #00677f); color: #fff;
+  padding: 0 4px; border-radius: 5px; font-size: 0.8em; line-height: 1.4;
+}
 </style>
