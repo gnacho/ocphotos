@@ -14,7 +14,9 @@ expuesto en el mismo origen como `/ocphotos-api/`.
 - **Explore**: hub con buscador por fichero/cámara/ruta y accesos rápidos.
 - **Mapa**: marcadores de las fotos con GPS (`/api/geo`) sobre OpenStreetMap.
 - **Favoritos**: marcar/desmarcar desde el visor y listado propio.
-- **Recuerdos** ("Un día como hoy…") agrupados por año.
+- **"Un día como hoy"**: tira superior en el Timeline con tarjetas "hace X años"
+  (rango ±3 días, como Memories) que saltan a esa fecha, más página propia agrupada
+  por año.
 - **Visor**: para los formatos que cubre la app nativa de OpenCloud
   (jpg/png/gif/tiff/bmp/webp/svg y vídeo) se **delega en su visor nativo**
   (`/preview/...`, con zoom y controles). HEIC/HEIF y RAW, que el nativo no
