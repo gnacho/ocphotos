@@ -90,7 +90,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600">
             <Images size={15} className="text-white" />
           </div>
-          <span className="hidden font-semibold text-white sm:block">OpenCloud Memories</span>
+          <span className="hidden font-semibold text-white sm:block">ocphotos</span>
         </div>
         <div className="relative mx-auto w-full max-w-xl">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />

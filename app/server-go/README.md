@@ -1,4 +1,4 @@
-# photos-service (OpenCloud Memories — backend)
+# photos-service (ocphotos backend)
 
 Microservicio Go que acompaña a la PWA. OpenCloud sigue siendo la fuente de
 verdad de los ficheros; este servicio mantiene el índice de metadatos.

@@ -1,4 +1,4 @@
-// photos-service — backend de OpenCloud Memories.
+// photos-service — backend de ocphotos.
 //
 // Arquitectura (fase MVP):
 //   - Scanner WebDAV incremental (etag) → tabla assets (Postgres)

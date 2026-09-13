@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/tu-usuario/opencloud-memories/photos-service/internal/dav"
+	"github.com/gnacho/ocphotos/photos-service/internal/dav"
 )
 
 type AssetStore interface {

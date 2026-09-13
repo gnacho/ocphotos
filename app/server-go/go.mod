@@ -1,4 +1,4 @@
-module github.com/tu-usuario/opencloud-memories/photos-service
+module github.com/gnacho/ocphotos/photos-service
 
 go 1.24
 

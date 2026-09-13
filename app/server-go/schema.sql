@@ -1,4 +1,4 @@
--- OpenCloud Memories — photos-service
+-- ocphotos — photos-service
 -- PostgreSQL 16+ (pgvector/VectorChord opcional hasta la fase ML)
 
 CREATE TABLE assets (
