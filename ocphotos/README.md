@@ -11,6 +11,8 @@ expuesto en el mismo origen como `/ocphotos-api/`.
   sticky y scroll infinito por paginación keyset; miniaturas generadas por el
   backend (incluye **HEIC/HEIF**, que OpenCloud no decodifica).
 - **Rewind**: scrubber de años para saltar a cualquier fecha (`/api/timeline/calendar`).
+- **Auto-sync**: al abrir/enfocar y cada 30 s pide un rescan al backend y recarga el
+  timeline si cambió el número de fotos (las subidas aparecen solas).
 - **Explore**: hub con buscador por fichero/cámara/ruta y accesos rápidos.
 - **Mapa**: marcadores de las fotos con GPS (`/api/geo`) sobre OpenStreetMap.
 - **Favoritos**: marcar/desmarcar desde el visor y listado propio.
