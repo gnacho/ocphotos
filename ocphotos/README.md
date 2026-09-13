@@ -22,12 +22,16 @@ expuesto en el mismo origen como `/ocphotos-api/`.
   anteriores y, si no, las fotos más antiguas (`/api/memories/highlights`).
 - **Navegación nativa**: los apartados van en el **sidebar izquierdo del host**
   (`navItems`): Photos, On this day, Explore, Map, Favorites. Sin barras propias.
-- **Visor**: para los formatos que cubre la app nativa de OpenCloud
-  (jpg/png/gif/tiff/bmp/webp/svg y vídeo) se **delega en su visor nativo**
-  (`/preview/...`, con zoom y controles). HEIC/HEIF y RAW, que el nativo no
-  soporta, usan el visor propio (preview del backend a 2048, favorito, descarga y
-  datos de captura). Nota: la navegación siguiente/anterior del nativo es por
-  carpeta, no por el timeline.
+- **Visor propio** (a pantalla completa, preview de 2048, favorito, añadir a
+  álbum, descarga y datos de captura). Se usa para **todos** los formatos: abrir
+  la foto en el visor nativo de OpenCloud sacaba al usuario de la app de fotos
+  (es otra app del host), así que no se delega.
+- **Álbumes**: crear, renombrar, borrar; abrir un álbum, quitar fotos y añadir
+  desde el visor o desde la rejilla del timeline (botón +).
+- **Lugares**: agrupación de fotos con GPS por zona (~1 km) con **geocodificación
+  inversa** (Nominatim, cacheada en SQLite) y vista con portada.
+- **i18n**: traducciones al español en `l10n/translations.json` (sigue el idioma
+  del host).
 - Registrada en el **conmutador de aplicaciones** (appMenuItem).
 
 Pendiente de la Etapa 3: caras/CLIP (microservicio ML), álbumes, posters de vídeo.
