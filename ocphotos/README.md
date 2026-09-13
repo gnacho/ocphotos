@@ -18,7 +18,10 @@ expuesto en el mismo origen como `/ocphotos-api/`.
 - **Favoritos**: marcar/desmarcar desde el visor y listado propio.
 - **"Un día como hoy"**: tira superior en el Timeline con tarjetas "hace X años"
   (rango ±3 días, como Memories) que saltan a esa fecha, más página propia agrupada
-  por año.
+  por año. Si no hay coincidencias del día, cae a **highlights**: mismo mes de años
+  anteriores y, si no, las fotos más antiguas (`/api/memories/highlights`).
+- **Navegación nativa**: los apartados van en el **sidebar izquierdo del host**
+  (`navItems`): Photos, On this day, Explore, Map, Favorites. Sin barras propias.
 - **Visor**: para los formatos que cubre la app nativa de OpenCloud
   (jpg/png/gif/tiff/bmp/webp/svg y vídeo) se **delega en su visor nativo**
   (`/preview/...`, con zoom y controles). HEIC/HEIF y RAW, que el nativo no
