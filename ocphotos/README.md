@@ -8,6 +8,9 @@ sobre el skeleton oficial. Sin iframe, sin tokens propios: usa la **sesión del 
 - **Timeline** por días con headers sticky, scroll infinito por páginas de días,
   miniaturas servidas por el propio OpenCloud (`?x=&y=&processor=thumbnail`).
 - **Visor** a pantalla completa con navegación por teclado, vídeo y descarga.
+- **HEIC/HEIF**: si el preview del host falla (OpenCloud no decodifica HEIC), la
+  extensión pide la miniatura al photos-service (`/ocphotos-api/api/thumb`), que
+  la decodifica en servidor.
 - **Recuerdos** ("Un día como hoy…") agrupados por año.
 - Indexado por **WebDAV con la sesión del usuario** (PROPFIND recursivo desde una
   carpeta raíz). La raíz por defecto es `/Fotos` y se cambia desde el **selector

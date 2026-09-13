@@ -18,9 +18,25 @@ este servicio mantiene el índice de metadatos y sirve la PWA.
 | Álbumes API | ⬜ v0.2 (esquema listo en el store) |
 | ML (caras/CLIP) | ⬜ fase 3 — microservicio Python aparte (InsightFace/CLIP ONNX o `immich-machine-learning`) |
 | Vídeo (posters/transcoding) | ⬜ fase posterior (ffmpeg, patrón go-vod) |
-| HEIC/RAW | ⚠️ sin decodificador Go puro: se sirve el original (los thumbs fallan con fallback) |
+| HEIC/HEIF | ✅ decodificador HEVC en Go puro (`gen2brain/h265`, sin CGo ni libvips); registra el formato en `image.Decode` |
+| RAW | ⚠️ sin decodificador: se sirve el original |
 
-## Despliegue (Docker, recomendado)
+## Endpoint sin estado para HEIC
+
+`GET /api/thumb?path=<ruta>&w=<n>[&etag=<e>]` genera la miniatura de un fichero
+por su ruta dentro del espacio, sin depender del índice. Lo usa la extensión
+OpenCloud como **fallback** cuando el preview del host falla (HEIC). Auth: el
+Bearer de la sesión web (validado contra Graph `/me`) o el `MEMORIES_TOKEN`.
+El servicio es **single-tenant**: solo atiende a la sesión de su usuario.
+
+## Despliegue en cloud.example.com (systemd, the OpenCloud container)
+
+Binario estático (`CGO_ENABLED=0`), usuario `ocphotos`, `/var/lib/ocphotos`,
+env `/etc/ocphotos/env`, unit `ocphotos.service`, puerto **:8097**. Expuesto
+como `https://cloud.example.com/ocphotos-api/` (location NPM en el the vhost,
+con `proxy_pass .../` para quitar el prefijo). Ver `deploy/README.md`.
+
+## Despliegue (Docker, alternativa)
 
 ```bash
 # en la raíz del proyecto (un nivel por encima de server-go/)

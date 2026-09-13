@@ -73,3 +73,32 @@ The app registers itself in the app switcher as `app.ocphotos.menuItem`.
 
   Restart OpenCloud after changing `apps.yaml`. A user's pick in the UI takes
   precedence over the configured default.
+
+## 3. photos-service (HEIC thumbnails + EXIF backend)
+
+OpenCloud's thumbnails service does not decode HEIC (only png/jpg/gif/tiff/bmp),
+so the extension falls back to the `photos-service`, which decodes HEIC/HEIF with
+a pure-Go decoder (`gen2brain/h265`, no CGo, no libvips).
+
+- Host: the OpenCloud container, static binary at `/usr/local/bin/photos-service`, system user
+  `ocphotos`, data in `/var/lib/ocphotos`, env in `/etc/ocphotos/env` (640),
+  unit `ocphotos.service`, port `:8097`.
+- Env: `OC_BASE_URL=http://127.0.0.1:9200`, `OC_USER`, `OC_APP_TOKEN`,
+  `MEMORIES_TOKEN`, `SCAN_ROOT=Fotos`, `SCAN_EVERY=30m`, `DATA_DIR`.
+- Exposed by NPM (the vhost on the proxy host) as `/ocphotos-api/` ->
+  `http://service-host:8097/` (trailing slash strips the prefix). Backup of the
+  vhost: `vhost.conf.bak-api`.
+- The extension calls `/ocphotos-api/api/thumb?path=/Fotos/x.heic&w=400&etag=...`
+  with the host session Bearer. The service validates it against Graph `/me` and
+  only answers for its own user (single-tenant).
+
+Deploy the binary:
+
+```bash
+cd app/server-go
+CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /tmp/photos-service ./cmd/photos-service
+# stop the service first: pushing over a running binary fails with "Text file busy"
+systemctl stop ocphotos
+# copy /tmp/photos-service to /usr/local/bin/photos-service (0755), then:
+systemctl start ocphotos
+```
