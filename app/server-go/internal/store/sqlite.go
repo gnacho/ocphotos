@@ -308,6 +308,48 @@ func (s *Store) OnThisDay(ctx context.Context, month, day, thisYear, dayRange in
 	return out, rows.Err()
 }
 
+// OnThisMonth: fotos del mes actual en años anteriores (fallback de highlights).
+func (s *Store) OnThisMonth(ctx context.Context, month, thisYear, limit int) ([]Asset, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+assetCols+` FROM assets
+		 WHERE deleted_at IS NULL
+		   AND CAST(strftime('%m', taken_at, 'unixepoch') AS INT) = ?
+		   AND CAST(strftime('%Y', taken_at, 'unixepoch') AS INT) < ?
+		 ORDER BY taken_at DESC LIMIT ?`, month, thisYear, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Asset{}
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// OldestAssets: las fotos más antiguas (último recurso de highlights).
+func (s *Store) OldestAssets(ctx context.Context, limit int) ([]Asset, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+assetCols+` FROM assets WHERE deleted_at IS NULL ORDER BY taken_at ASC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Asset{}
+	for rows.Next() {
+		a, err := scanAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) GeoAssets(ctx context.Context, limit int) ([]Asset, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+assetCols+` FROM assets WHERE deleted_at IS NULL AND lat IS NOT NULL ORDER BY taken_at DESC LIMIT ?`, limit)

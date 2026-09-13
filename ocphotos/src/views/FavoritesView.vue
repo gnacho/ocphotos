@@ -3,11 +3,6 @@
     <div class="fav-toolbar">
       <h1 v-text="$gettext('Favorites')" />
       <span class="fav-count" v-text="$gettext('%{n} items', { n: photos.length })" />
-      <nav class="fav-nav">
-        <router-link to="/ocphotos/timeline" v-text="$gettext('Photos')" />
-        <router-link to="/ocphotos/memories" v-text="$gettext('Memories')" />
-        <router-link to="/ocphotos/map" v-text="$gettext('Map')" />
-      </nav>
     </div>
 
     <div v-if="loading" class="fav-note" v-text="$gettext('Loading…')" />

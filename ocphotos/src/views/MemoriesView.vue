@@ -2,11 +2,6 @@
   <div class="memories-view">
     <div class="memories-toolbar">
       <h1 v-text="$gettext('On this day…')" />
-      <nav class="memories-nav">
-        <router-link to="/ocphotos/timeline" v-text="$gettext('Photos')" />
-        <router-link to="/ocphotos/map" v-text="$gettext('Map')" />
-        <router-link to="/ocphotos/favorites" v-text="$gettext('Favorites')" />
-      </nav>
     </div>
 
     <div v-if="loading" class="memories-note" v-text="$gettext('Loading…')" />

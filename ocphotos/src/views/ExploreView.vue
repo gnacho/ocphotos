@@ -2,12 +2,6 @@
   <div class="explore-view">
     <div class="explore-toolbar">
       <h1 v-text="$gettext('Explore')" />
-      <nav class="explore-nav">
-        <router-link to="/ocphotos/timeline" v-text="$gettext('Photos')" />
-        <router-link to="/ocphotos/memories" v-text="$gettext('Memories')" />
-        <router-link to="/ocphotos/map" v-text="$gettext('Map')" />
-        <router-link to="/ocphotos/favorites" v-text="$gettext('Favorites')" />
-      </nav>
     </div>
 
     <div class="explore-body">

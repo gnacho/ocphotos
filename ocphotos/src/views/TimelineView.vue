@@ -7,12 +7,6 @@
       <oc-button appearance="raw" :aria-label="$gettext('Rescan')" @click="rescan">
         <oc-icon name="refresh" size="small" />
       </oc-button>
-      <nav class="photos-nav">
-        <router-link to="/ocphotos/explore" v-text="$gettext('Explore')" />
-        <router-link to="/ocphotos/memories" v-text="$gettext('Memories')" />
-        <router-link to="/ocphotos/map" v-text="$gettext('Map')" />
-        <router-link to="/ocphotos/favorites" v-text="$gettext('Favorites')" />
-      </nav>
     </div>
 
     <div v-if="error" class="photos-error" v-text="error" />
@@ -22,12 +16,15 @@
 
     <div v-else class="photos-body">
       <div class="photos-scroll">
-        <!-- On this day: "hace X años" (como Memories) -->
-        <div v-if="onThisDay.length" class="otd">
-          <button v-for="y in onThisDay" :key="y.year" class="otd-card" @click="jumpToPhoto(y.photo)">
-            <img :src="thumbSrc(y.photo)" :alt="y.label" loading="lazy" @error="onImgError" />
-            <span class="otd-label" v-text="y.label" />
-          </button>
+        <!-- On this day: "hace X años" (como Memories); si no hay de hoy, highlights -->
+        <div v-if="onThisDay.length" class="otd-block">
+          <h2 class="otd-title" v-text="otdTitle" />
+          <div class="otd">
+            <button v-for="y in onThisDay" :key="y.year" class="otd-card" @click="jumpToPhoto(y.photo)">
+              <img :src="thumbSrc(y.photo)" :alt="y.label" loading="lazy" @error="onImgError" />
+              <span class="otd-label" v-text="y.label" />
+            </button>
+          </div>
         </div>
 
         <section v-for="m in months" :key="m.key" class="photos-month">
@@ -94,7 +91,7 @@ export default defineComponent({
     const { $gettext } = useGettext()
     const {
       photos, loading, error, months, exhausted, startAt,
-      init, loadMore, jumpTo, fetchCalendar, fetchOnThisDay, rescan, previews, ensurePreview, ensureOriginal, openPreview, startWatching
+      init, loadMore, jumpTo, fetchCalendar, fetchHighlights, rescan, previews, ensurePreview, ensureOriginal, openPreview, startWatching
     } = usePhotoLibrary()
 
     const sentinel = ref<HTMLElement | null>(null)
@@ -116,6 +113,16 @@ export default defineComponent({
     const jumpToPhoto = (p: Photo): void => {
       void jumpTo(p.takenAt)
     }
+
+    const otdScope = ref('day')
+    const otdTitle = computed(() => {
+      if (otdScope.value === 'day') return $gettext('On this day')
+      if (otdScope.value === 'month') {
+        const month = new Intl.DateTimeFormat(navigator.language || 'en', { month: 'long' }).format(new Date())
+        return $gettext('%{month} in previous years', { month })
+      }
+      return $gettext('Older')
+    })
 
     const topYear = computed(() => (photos.value[0] ? new Date(photos.value[0].takenAt * 1000).getFullYear() : null))
 
@@ -162,10 +169,12 @@ export default defineComponent({
         /* sin scrubber si falla */
       }
       try {
-        otdPhotos.value = await fetchOnThisDay(3)
+        const h = await fetchHighlights()
+        otdScope.value = h.scope
+        otdPhotos.value = h.photos
         for (const p of otdPhotos.value.slice(0, 12)) void ensurePreview(p, 400)
       } catch {
-        /* sin tira on-this-day si falla */
+        /* sin tira de highlights si falla */
       }
       const obs = new IntersectionObserver(
         (entries) => {
@@ -177,7 +186,7 @@ export default defineComponent({
     })
 
     return {
-      photos, loading, error, months, years, topYear, startAt, sentinel, onThisDay, jumpToPhoto,
+      photos, loading, error, months, years, topYear, startAt, sentinel, onThisDay, otdTitle, jumpToPhoto,
       viewerList, viewerIndex, openViewer, formatDay, onImgError, jumpTo, jumpToYear,
       rescan, thumbSrc, ensurePreview, ensureOriginal
     }
@@ -202,7 +211,9 @@ export default defineComponent({
 .photos-body { flex: 1; min-height: 0; display: flex; }
 .photos-scroll { flex: 1; overflow-y: auto; padding: 0 8px; }
 /* On this day */
-.otd { display: flex; gap: 8px; overflow-x: auto; padding: 10px 4px; }
+.otd-block { padding: 8px 4px 4px; }
+.otd-title { margin: 0 0 6px; font-size: 0.95rem; font-weight: 700; }
+.otd { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 6px; }
 .otd-card {
   position: relative; flex: 0 0 auto; width: 150px; height: 110px; padding: 0; border: 0;
   border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--oc-role-surface-container, #f6f8fa);

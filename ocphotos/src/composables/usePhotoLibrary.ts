@@ -290,6 +290,13 @@ export function usePhotoLibrary() {
     return (json.assets ?? []).map(toPhoto)
   }
 
+  /** Highlights de "On this day": mismo día -> mismo mes -> más antiguas. */
+  const fetchHighlights = async (): Promise<{ scope: string; photos: Photo[] }> => {
+    const res = await api('/api/memories/highlights')
+    const json = (await res.json()) as { scope?: string; assets?: ApiAsset[] }
+    return { scope: json.scope ?? 'oldest', photos: (json.assets ?? []).map(toPhoto) }
+  }
+
   const ext = (name: string) => {
     const i = name.lastIndexOf('.')
     return i >= 0 ? name.slice(i).toLowerCase() : ''
@@ -346,6 +353,7 @@ export function usePhotoLibrary() {
     toggleFavorite,
     fetchGeo,
     fetchOnThisDay,
+    fetchHighlights,
     fetchFavorites,
     searchAssets,
     canNativePreview,

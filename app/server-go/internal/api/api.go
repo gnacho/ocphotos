@@ -53,6 +53,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/assets/{id}/original", s.original)
 	mux.HandleFunc("GET /api/memories/on-this-day", s.onThisDay)
 	mux.HandleFunc("GET /api/timeline/calendar", s.calendar)
+	mux.HandleFunc("GET /api/memories/highlights", s.highlights)
 	mux.HandleFunc("GET /api/geo", s.geo)
 	mux.HandleFunc("POST /api/admin/rescan", s.rescan)
 	return s.withAuth(withCORS(mux))
@@ -295,6 +296,27 @@ func (s *Server) onThisDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"assets": list, "days": days})
+}
+
+// highlights: contenido para la sección "On this day". Intenta, en orden:
+// mismo día (años anteriores), mismo mes (años anteriores), las más antiguas.
+func (s *Server) highlights(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+	ctx := r.Context()
+	if list, err := s.st.OnThisDay(ctx, int(now.Month()), now.Day(), now.Year(), 3); err == nil && len(list) > 0 {
+		writeJSON(w, map[string]any{"scope": "day", "assets": list})
+		return
+	}
+	if list, err := s.st.OnThisMonth(ctx, int(now.Month()), now.Year(), 60); err == nil && len(list) > 0 {
+		writeJSON(w, map[string]any{"scope": "month", "assets": list})
+		return
+	}
+	list, err := s.st.OldestAssets(ctx, 20)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	writeJSON(w, map[string]any{"scope": "oldest", "assets": list})
 }
 
 func (s *Server) calendar(w http.ResponseWriter, r *http.Request) {

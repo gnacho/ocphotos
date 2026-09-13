@@ -2,7 +2,8 @@ import {
   defineWebApplication,
   ApplicationSetupOptions,
   Extension,
-  AppMenuItemExtension
+  AppMenuItemExtension,
+  AppNavigationItem
 } from '@opencloud-eu/web-pkg'
 import { urlJoin } from '@opencloud-eu/web-client'
 import '@opencloud-eu/extension-sdk/tailwind.css'
@@ -32,7 +33,7 @@ export default defineWebApplication({
         component: () => import('./views/TimelineView.vue'),
         meta: {
           authContext: 'user',
-          title: $gettext('Timeline')
+          title: $gettext('Photos')
         }
       },
       {
@@ -41,7 +42,16 @@ export default defineWebApplication({
         component: () => import('./views/MemoriesView.vue'),
         meta: {
           authContext: 'user',
-          title: $gettext('Memories')
+          title: $gettext('On this day')
+        }
+      },
+      {
+        path: '/explore',
+        name: 'photos-explore',
+        component: () => import('./views/ExploreView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Explore')
         }
       },
       {
@@ -61,15 +71,40 @@ export default defineWebApplication({
           authContext: 'user',
           title: $gettext('Favorites')
         }
+      }
+    ]
+
+    // Navegación en el sidebar IZQUIERDO nativo del host (como Files/News/Notes)
+    const navItems: AppNavigationItem[] = [
+      {
+        name: $gettext('Photos'),
+        icon: 'image',
+        route: { path: `/${appInfo.id}/timeline` },
+        priority: 10
       },
       {
-        path: '/explore',
-        name: 'photos-explore',
-        component: () => import('./views/ExploreView.vue'),
-        meta: {
-          authContext: 'user',
-          title: $gettext('Explore')
-        }
+        name: $gettext('On this day'),
+        icon: 'calendar',
+        route: { path: `/${appInfo.id}/memories` },
+        priority: 20
+      },
+      {
+        name: $gettext('Explore'),
+        icon: 'apps-2',
+        route: { path: `/${appInfo.id}/explore` },
+        priority: 30
+      },
+      {
+        name: $gettext('Map'),
+        icon: 'map-2',
+        route: { path: `/${appInfo.id}/map` },
+        priority: 40
+      },
+      {
+        name: $gettext('Favorites'),
+        icon: 'heart',
+        route: { path: `/${appInfo.id}/favorites` },
+        priority: 50
       }
     ]
 
@@ -93,6 +128,7 @@ export default defineWebApplication({
     return {
       appInfo,
       routes,
+      navItems,
       extensions: extensions(args)
     }
   }

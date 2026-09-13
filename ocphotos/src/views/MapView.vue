@@ -3,11 +3,6 @@
     <div class="map-toolbar">
       <h1 v-text="$gettext('Map')" />
       <span class="map-count" v-text="$gettext('%{n} located', { n: photos.length })" />
-      <nav class="map-nav">
-        <router-link to="/ocphotos/timeline" v-text="$gettext('Photos')" />
-        <router-link to="/ocphotos/memories" v-text="$gettext('Memories')" />
-        <router-link to="/ocphotos/favorites" v-text="$gettext('Favorites')" />
-      </nav>
     </div>
 
     <div v-if="loading" class="map-note" v-text="$gettext('Loading…')" />
