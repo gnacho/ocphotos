@@ -1,11 +1,11 @@
 <template>
   <div class="viewer" @keydown.esc="$emit('close')" tabindex="0" ref="root">
     <div class="viewer-top">
-      <oc-button appearance="raw" :aria-label="$gettext('Cerrar')" @click="$emit('close')">
+      <oc-button appearance="raw" :aria-label="$gettext('Close')" @click="$emit('close')">
         <oc-icon name="close" color="#fff" />
       </oc-button>
       <span class="viewer-name">{{ current?.name }}</span>
-      <oc-button appearance="raw" :aria-label="$gettext('Descargar')" @click="download">
+      <oc-button appearance="raw" :aria-label="$gettext('Download')" @click="download">
         <oc-icon name="file-download" color="#fff" />
       </oc-button>
     </div>
@@ -13,7 +13,7 @@
     <div class="viewer-stage" @click.self="$emit('close')">
       <video v-if="current?.isVideo" :src="src" controls autoplay class="viewer-media" />
       <img v-else-if="current && src" :src="src" :alt="current.name" class="viewer-media" />
-      <span v-else-if="current" class="viewer-loading" v-text="$gettext('Cargando…')" />
+      <span v-else-if="current" class="viewer-loading" v-text="$gettext('Loading…')" />
     </div>
     <button v-if="index < photos.length - 1" class="viewer-arrow right" @click="$emit('navigate', index + 1)">›</button>
   </div>
@@ -89,7 +89,7 @@ export default defineComponent({
 }
 .viewer-top {
   display: flex; align-items: center; justify-content: space-between;
-  padding: var(--oc-space-small) var(--oc-space-medium);
+  padding: 8px 16px;
 }
 .viewer-name { color: #ddd; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewer-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }

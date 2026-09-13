@@ -1,30 +1,30 @@
 <template>
   <div class="photos-view">
     <div class="photos-toolbar">
-      <h1 class="photos-title" v-text="$gettext('Fotos')" />
-      <button class="photos-folder" :title="$gettext('Cambiar carpeta')" @click="pickerOpen = true">
+      <h1 class="photos-title" v-text="$gettext('Photos')" />
+      <button class="photos-folder" :title="$gettext('Change folder')" @click="pickerOpen = true">
         <oc-icon name="folder" size="small" />
         <span v-text="rootLabel" />
       </button>
-      <span v-if="loading" class="photos-progress" v-text="progress || $gettext('Indexando…')" />
-      <span v-else class="photos-count" v-text="$gettext('%{n} elementos', { n: photos.length })" />
-      <oc-button appearance="raw" :aria-label="$gettext('Reescanear')" @click="rescan(root)">
+      <span v-if="loading" class="photos-progress" v-text="progress || $gettext('Indexing…')" />
+      <span v-else class="photos-count" v-text="$gettext('%{n} items', { n: photos.length })" />
+      <oc-button appearance="raw" :aria-label="$gettext('Rescan')" @click="rescan(root)">
         <oc-icon name="refresh" size="small" />
       </oc-button>
-      <router-link to="/ocphotos/memories" class="photos-nav" v-text="$gettext('Recuerdos')" />
+      <router-link to="/ocphotos/memories" class="photos-nav" v-text="$gettext('Memories')" />
     </div>
 
     <div v-if="fallbackFrom && !loading" class="photos-banner">
-      <span v-text="$gettext('La carpeta %{root} no existe; mostrando todo el espacio personal.', { root: fallbackFrom })" />
-      <oc-button appearance="raw" @click="pickerOpen = true">{{ $gettext('Elegir carpeta') }}</oc-button>
+      <span v-text="$gettext('Folder %{root} does not exist; showing the whole personal space.', { root: fallbackFrom })" />
+      <oc-button appearance="raw" @click="pickerOpen = true">{{ $gettext('Choose folder') }}</oc-button>
     </div>
 
     <div v-if="error" class="photos-error" v-text="error" />
     <div v-else-if="!loading && photos.length === 0" class="photos-empty">
-      <p v-if="rootMissing" v-text="$gettext('La carpeta %{root} no existe en tu espacio', { root: rootLabel })" />
-      <p v-else v-text="$gettext('No hay fotos en %{root}', { root: rootLabel })" />
+      <p v-if="rootMissing" v-text="$gettext('Folder %{root} does not exist in your space', { root: rootLabel })" />
+      <p v-else v-text="$gettext('No photos in %{root}', { root: rootLabel })" />
       <oc-button appearance="filled" color-role="primary" @click="pickerOpen = true">
-        {{ $gettext('Elegir carpeta') }}
+        {{ $gettext('Choose folder') }}
       </oc-button>
     </div>
 
@@ -82,7 +82,7 @@ export default defineComponent({
     const { photos, loading, progress, error, days, root, rootMissing, fallbackFrom, init, setRoot, rescan, previews, ensurePreview, ensureOriginal } =
       usePhotoLibrary()
 
-    const rootLabel = computed(() => root.value || $gettext('todo el espacio'))
+    const rootLabel = computed(() => root.value || $gettext('whole space'))
     const pickerOpen = ref(false)
     const onSelectFolder = async (path: string) => {
       pickerOpen.value = false
@@ -113,7 +113,7 @@ export default defineComponent({
     }
 
     const formatDay = (d: Date) =>
-      new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
+      new Intl.DateTimeFormat(navigator.language || 'en', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
 
     const onImgError = (e: Event) => {
       // formatos sin preview (HEIC/RAW/vídeo): placeholder neutro
@@ -146,45 +146,45 @@ export default defineComponent({
 <style scoped>
 .photos-view { display: flex; flex-direction: column; height: 100%; }
 .photos-toolbar {
-  display: flex; align-items: center; gap: var(--oc-space-medium);
-  padding: var(--oc-space-small) var(--oc-space-medium);
-  border-bottom: 1px solid var(--oc-color-border);
+  display: flex; align-items: center; gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--oc-role-outline-variant, #bfc8cc);
 }
 .photos-title { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .photos-folder {
   display: inline-flex; align-items: center; gap: 6px; max-width: 40%;
-  padding: 2px 8px; border: 1px solid var(--oc-color-border); border-radius: 6px;
-  background: none; color: var(--oc-color-text-muted); cursor: pointer; font-size: 0.8rem;
+  padding: 2px 8px; border: 1px solid var(--oc-role-outline-variant, #bfc8cc); border-radius: 6px;
+  background: none; color: var(--oc-role-on-surface-variant, #40484c); cursor: pointer; font-size: 0.8rem;
 }
 .photos-folder span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.photos-folder:hover { background: var(--oc-color-background-muted); }
-.photos-progress, .photos-count { font-size: 0.8rem; color: var(--oc-color-text-muted); }
+.photos-folder:hover { background: var(--oc-role-surface-container, #f6f8fa); }
+.photos-progress, .photos-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
 .photos-nav { margin-left: auto; font-size: 0.85rem; }
 .photos-banner {
-  display: flex; align-items: center; gap: var(--oc-space-small); flex-wrap: wrap;
-  padding: var(--oc-space-small) var(--oc-space-medium); font-size: 0.85rem;
-  background: var(--oc-color-background-muted); color: var(--oc-color-text-muted);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 16px; font-size: 0.85rem;
+  background: var(--oc-role-surface-container, #f6f8fa); color: var(--oc-role-on-surface-variant, #40484c);
 }
-.photos-error { padding: var(--oc-space-medium); color: var(--oc-color-swatch-danger-default); }
+.photos-error { padding: 16px; color: var(--oc-role-error, #ba1a1a); }
 .photos-empty {
-  display: flex; flex-direction: column; align-items: center; gap: var(--oc-space-small);
-  padding: var(--oc-space-xlarge); text-align: center; color: var(--oc-color-text-muted);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c);
 }
 .photos-empty p { margin: 0; }
-.photos-scroll { flex: 1; overflow-y: auto; padding: 0 var(--oc-space-small); }
+.photos-scroll { flex: 1; overflow-y: auto; padding: 0 8px; }
 .photos-day-header {
-  position: sticky; top: 0; z-index: 1; margin: 0; padding: var(--oc-space-small) 0;
+  position: sticky; top: 0; z-index: 1; margin: 0; padding: 8px 0;
   font-size: 0.8rem; font-weight: 500; text-transform: capitalize;
-  background: var(--oc-color-background-default);
+  background: var(--oc-role-surface, #fff);
 }
-.photos-day-header span { color: var(--oc-color-text-muted); margin-left: 0.5em; }
+.photos-day-header span { color: var(--oc-role-on-surface-variant, #40484c); margin-left: 0.5em; }
 .photos-grid {
   display: grid; gap: 2px;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 .photos-cell {
   position: relative; aspect-ratio: 1; padding: 0; border: 0; cursor: pointer;
-  background: var(--oc-color-background-muted); overflow: hidden;
+  background: var(--oc-role-surface-container, #f6f8fa); overflow: hidden;
 }
 .photos-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photos-video-badge {
