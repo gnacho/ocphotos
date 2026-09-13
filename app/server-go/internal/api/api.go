@@ -5,7 +5,12 @@ package api
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"image"
 	_ "image/jpeg"
 	"io"
@@ -13,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +29,7 @@ import (
 	"github.com/opencloud-memories/photos-service/internal/phash"
 	"github.com/opencloud-memories/photos-service/internal/store"
 	"github.com/opencloud-memories/photos-service/internal/thumb"
+	"github.com/opencloud-memories/photos-service/internal/video"
 )
 
 type Server struct {
@@ -31,6 +38,8 @@ type Server struct {
 	dav       *dav.Client
 	scanner   *index.Scanner
 	geo       *geo.Geocoder
+	video     *video.Transcoder
+	dataDir   string
 	webdavURL string
 	scanRoot  string
 	ocBaseURL string
@@ -40,9 +49,9 @@ type Server struct {
 	rescanCh  chan struct{}
 }
 
-func New(st *store.Store, th *thumb.Service, dc *dav.Client, sc *index.Scanner, gc *geo.Geocoder, webdavURL, scanRoot, ocBaseURL, ocUserID, token string, log *slog.Logger) *Server {
+func New(st *store.Store, th *thumb.Service, dc *dav.Client, sc *index.Scanner, gc *geo.Geocoder, vt *video.Transcoder, dataDir, webdavURL, scanRoot, ocBaseURL, ocUserID, token string, log *slog.Logger) *Server {
 	return &Server{
-		st: st, thumbs: th, dav: dc, scanner: sc, geo: gc,
+		st: st, thumbs: th, dav: dc, scanner: sc, geo: gc, video: vt, dataDir: dataDir,
 		webdavURL: webdavURL, scanRoot: scanRoot, ocBaseURL: ocBaseURL, ocUserID: ocUserID, token: token, log: log,
 		rescanCh: make(chan struct{}, 1),
 	}
@@ -58,6 +67,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/assets/{id}/archive", s.archive)
 	mux.HandleFunc("GET /api/duplicates", s.duplicates)
 	mux.HandleFunc("GET /api/assets/{id}/thumb", s.thumbHandler)
+	mux.HandleFunc("GET /api/assets/{id}/hls/{file}", s.hls)
+	mux.HandleFunc("POST /api/assets/{id}/video-url", s.videoURL)
+	mux.HandleFunc("GET /api/video/{id}", s.videoStream)
 	mux.HandleFunc("GET /api/thumb", s.thumbByPath)
 	mux.HandleFunc("GET /api/assets/{id}/original", s.original)
 	mux.HandleFunc("GET /api/memories/on-this-day", s.onThisDay)
@@ -84,7 +96,8 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" {
+		// /api/video/ va firmado en la URL (el <video> no puede mandar cabeceras)
+		if r.URL.Path == "/healthz" || strings.HasPrefix(r.URL.Path, "/api/video/") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -296,6 +309,104 @@ func (s *Server) duplicates(w http.ResponseWriter, r *http.Request) {
 		out = append(out, list)
 	}
 	writeJSON(w, map[string]any{"groups": out, "computed": computed, "pending": len(pending) - computed})
+}
+
+// --- Vídeo: URL firmada + streaming progresivo (Range) ---
+// El elemento <video> no puede mandar el Bearer y la CSP del host bloquea blob:,
+// así que se firma la URL (HMAC) y se sirve el original con soporte de Range.
+
+func (s *Server) mediaSecret() []byte {
+	p := filepath.Join(s.dataDir, "mediasecret")
+	if b, err := os.ReadFile(p); err == nil && len(b) >= 16 {
+		return b
+	}
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return []byte("ocphotos-fallback-secret")
+	}
+	_ = os.WriteFile(p, b, 0o600)
+	return b
+}
+
+func (s *Server) signVideo(id int64, exp int64) string {
+	mac := hmac.New(sha256.New, s.mediaSecret())
+	fmt.Fprintf(mac, "%d|%d", id, exp)
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// videoURL: firma una URL de streaming para un vídeo (requiere sesión).
+func (s *Server) videoURL(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	exp := time.Now().Add(6 * time.Hour).Unix()
+	writeJSON(w, map[string]any{
+		"url": fmt.Sprintf("/ocphotos-api/api/video/%d?exp=%d&sig=%s", id, exp, s.signVideo(id, exp)),
+	})
+}
+
+// videoStream: sirve el vídeo con soporte de Range (validando la firma).
+func (s *Server) videoStream(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	exp, _ := strconv.ParseInt(r.URL.Query().Get("exp"), 10, 64)
+	sig := r.URL.Query().Get("sig")
+	if exp < time.Now().Unix() || !hmac.Equal([]byte(sig), []byte(s.signVideo(id, exp))) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	a, err := s.st.AssetByID(r.Context(), id)
+	if err != nil || a.DeletedAt != nil {
+		http.Error(w, "not found", 404)
+		return
+	}
+	rc, hdr, status, err := s.dav.DownloadRange(r.Context(), a.Path, r.Header.Get("Range"))
+	if err != nil {
+		http.Error(w, err.Error(), 502)
+		return
+	}
+	defer rc.Close()
+	if ct := hdr.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	w.Header().Set("Accept-Ranges", "bytes")
+	if cr := hdr.Get("Content-Range"); cr != "" {
+		w.Header().Set("Content-Range", cr)
+	}
+	if cl := hdr.Get("Content-Length"); cl != "" {
+		w.Header().Set("Content-Length", cl)
+	}
+	w.WriteHeader(status)
+	_, _ = io.Copy(w, rc)
+}
+
+// hls: sirve la playlist y los segmentos HLS de un vídeo (transcodifica bajo demanda).
+func (s *Server) hls(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	a, err := s.st.AssetByID(r.Context(), id)
+	if err != nil || a.DeletedAt != nil {
+		http.Error(w, "not found", 404)
+		return
+	}
+	file := r.PathValue("file")
+	if file != filepath.Base(file) || (!strings.HasSuffix(file, ".m3u8") && !strings.HasSuffix(file, ".ts")) {
+		http.Error(w, "bad request", 400)
+		return
+	}
+	if s.video == nil {
+		http.Error(w, "transcoding no disponible", 501)
+		return
+	}
+	dir, err := s.video.HLS(r.Context(), a.Path, etagFor(a))
+	if err != nil {
+		s.log.Warn("hls", "id", id, "err", err)
+		http.Error(w, err.Error(), 502)
+		return
+	}
+	if strings.HasSuffix(file, ".m3u8") {
+		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+	} else {
+		w.Header().Set("Content-Type", "video/mp2t")
+	}
+	w.Header().Set("Cache-Control", "public, max-age=2592000, immutable")
+	http.ServeFile(w, r, filepath.Join(dir, file))
 }
 
 // computePHash: hash perceptual a partir de la miniatura en caché (no descarga el original).

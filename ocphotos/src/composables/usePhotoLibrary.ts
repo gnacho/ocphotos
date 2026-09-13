@@ -310,6 +310,13 @@ export function usePhotoLibrary() {
     }
   }
 
+  /** URL firmada de streaming progresivo para un vídeo (Range, mismo origen). */
+  const videoUrl = async (p: Photo): Promise<string> => {
+    const res = await api(`/api/assets/${p.id}/video-url`, { method: 'POST' })
+    const json = (await res.json()) as { url?: string }
+    return json.url ?? ''
+  }
+
   /** Original (o vídeo) del backend, como blob URL. */
   const ensureOriginal = async (p: Photo): Promise<string> => {
     const key = `o${p.id}`
@@ -483,6 +490,7 @@ export function usePhotoLibrary() {
     rescan,
     ensurePreview,
     ensureOriginal,
+    videoUrl,
     toggleFavorite,
     fetchGeo,
     fetchOnThisDay,

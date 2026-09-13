@@ -257,6 +257,25 @@ func (c *Client) GetRange(ctx context.Context, href string, n int64) ([]byte, er
 	return io.ReadAll(resp.Body)
 }
 
+// DownloadRange hace un GET pasando la cabecera Range (streaming de vídeo).
+// Devuelve el body, las cabeceras y el código de estado (200 o 206).
+func (c *Client) DownloadRange(ctx context.Context, href, rangeHeader string) (io.ReadCloser, http.Header, int, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.FileURL(href), nil)
+	req.SetBasicAuth(c.user, c.token)
+	if rangeHeader != "" {
+		req.Header.Set("Range", rangeHeader)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if resp.StatusCode >= 400 {
+		resp.Body.Close()
+		return nil, nil, resp.StatusCode, fmt.Errorf("range %s: %s", href, resp.Status)
+	}
+	return resp.Body, resp.Header, resp.StatusCode, nil
+}
+
 // Download abre un stream del fichero completo (caller cierra el body).
 func (c *Client) Download(ctx context.Context, href string) (io.ReadCloser, string, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.FileURL(href), nil)

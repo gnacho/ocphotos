@@ -35,7 +35,7 @@
 
     <button v-if="index > 0" class="viewer-arrow left" @click="$emit('navigate', index - 1)">‹</button>
     <div class="viewer-stage" @click.self="$emit('close')">
-      <video v-if="current?.isVideo" :src="src" controls autoplay class="viewer-media" />
+      <video v-if="current?.isVideo" ref="videoEl" controls autoplay playsinline class="viewer-media" />
       <img v-else-if="current && src" :src="src" :alt="current.name" class="viewer-media" />
       <span v-else-if="current" class="viewer-loading" v-text="$gettext('Loading…')" />
     </div>
@@ -56,7 +56,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, PropType, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, onUnmounted, PropType, ref, watch } from 'vue'
 import type { ProcessorType } from '@opencloud-eu/web-pkg'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import AlbumPicker from './AlbumPicker.vue'
@@ -78,9 +78,10 @@ export default defineComponent({
   },
   emits: ['close', 'navigate'],
   setup(props, { emit }) {
-    const { toggleFavorite, assetTags, addTag, removeTag, setArchived } = usePhotoLibrary()
+    const { toggleFavorite, assetTags, addTag, removeTag, setArchived, videoUrl } = usePhotoLibrary()
     const root = ref<HTMLElement | null>(null)
     const src = ref('')
+    const videoEl = ref<HTMLVideoElement | null>(null)
     const pickerOpen = ref(false)
     const tagsOpen = ref(false)
     const tags = ref<string[]>([])
@@ -120,13 +121,27 @@ export default defineComponent({
 
     // el host exige la sesión (Bearer), así que las imágenes se piden por la API
     // autenticada y se muestran como blob URL; los vídeos van por el original.
+    // Vídeo: URL firmada + streaming progresivo. El <video> no puede mandar el
+    // Bearer y la CSP del host bloquea blob:, así que va firmado en la URL.
+    const setupVideo = async (p: Photo) => {
+      await nextTick()
+      const el = videoEl.value
+      if (!el) return
+      const url = await videoUrl(p)
+      if (current.value === p && url) el.src = url
+    }
+
     watch(
       current,
       async (p) => {
         src.value = ''
         if (!p) return
-        const url = p.isVideo ? await props.ensureOriginal(p) : await props.ensurePreview(p, 2048)
-        if (current.value === p) src.value = url
+        if (p.isVideo) {
+          await setupVideo(p)
+        } else {
+          const url = await props.ensurePreview(p, 2048)
+          if (current.value === p) src.value = url
+        }
       },
       { immediate: true }
     )
@@ -163,7 +178,7 @@ export default defineComponent({
     }
     onMounted(() => window.addEventListener('keydown', onKey))
     onUnmounted(() => window.removeEventListener('keydown', onKey))
-    return { root, current, src, caption, download, onFavorite, archive, pickerOpen, tagsOpen, tags, newTag, toggleTags, submitTag, dropTag }
+    return { root, current, src, videoEl, caption, download, onFavorite, archive, pickerOpen, tagsOpen, tags, newTag, toggleTags, submitTag, dropTag }
   }
 })
 </script>

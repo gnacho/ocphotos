@@ -50,6 +50,9 @@ and generates thumbnails, including HEIC.
 - **Map**: photo **thumbnail markers** with count badges, grouped by place; click opens the photos.
 - **Duplicates**: perceptual hashes (dHash) to find near-identical photos.
 - **Archive**: hide photos from the timeline and keep them in their own view.
+- **Videos**: posters generated with ffmpeg (the timeline shows a real frame) and playback
+  via a **signed same-origin URL with HTTP Range** streaming. (HLS transcoding is implemented
+  in the service but the host CSP blocks `blob:`, so progressive playback is used instead.)
 - **Favorites**, **auto-sync** (new photos show up on their own) and **HEIC/HEIF** support
   (pure-Go decoder in the service).
 - **Native navigation**: the sections live in OpenCloud's left sidebar (`navItems`), and the
