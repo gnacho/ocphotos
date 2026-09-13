@@ -14,6 +14,11 @@
       <router-link to="/ocphotos/memories" class="photos-nav" v-text="$gettext('Recuerdos')" />
     </div>
 
+    <div v-if="fallbackFrom && !loading" class="photos-banner">
+      <span v-text="$gettext('La carpeta %{root} no existe; mostrando todo el espacio personal.', { root: fallbackFrom })" />
+      <oc-button appearance="raw" @click="pickerOpen = true">{{ $gettext('Elegir carpeta') }}</oc-button>
+    </div>
+
     <div v-if="error" class="photos-error" v-text="error" />
     <div v-else-if="!loading && photos.length === 0" class="photos-empty">
       <p v-if="rootMissing" v-text="$gettext('La carpeta %{root} no existe en tu espacio', { root: rootLabel })" />
@@ -62,6 +67,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import { useGettext } from 'vue3-gettext'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 import FolderPicker from '../components/FolderPicker.vue'
@@ -72,10 +78,11 @@ export default defineComponent({
   name: 'TimelineView',
   components: { ViewerOverlay, FolderPicker },
   setup() {
-    const { photos, loading, progress, error, days, root, rootMissing, init, setRoot, rescan, previews, ensurePreview, ensureOriginal } =
+    const { $gettext } = useGettext()
+    const { photos, loading, progress, error, days, root, rootMissing, fallbackFrom, init, setRoot, rescan, previews, ensurePreview, ensureOriginal } =
       usePhotoLibrary()
 
-    const rootLabel = computed(() => root.value || '/')
+    const rootLabel = computed(() => root.value || $gettext('todo el espacio'))
     const pickerOpen = ref(false)
     const onSelectFolder = async (path: string) => {
       pickerOpen.value = false
@@ -129,7 +136,7 @@ export default defineComponent({
     return {
       photos, loading, progress, error, visibleDays, sentinel,
       viewerList, viewerIndex, openViewer, formatDay, onImgError,
-      rescan, root, rootMissing, rootLabel, pickerOpen, onSelectFolder,
+      rescan, root, rootMissing, fallbackFrom, rootLabel, pickerOpen, onSelectFolder,
       thumbSrc, ensurePreview, ensureOriginal
     }
   }
@@ -153,6 +160,11 @@ export default defineComponent({
 .photos-folder:hover { background: var(--oc-color-background-muted); }
 .photos-progress, .photos-count { font-size: 0.8rem; color: var(--oc-color-text-muted); }
 .photos-nav { margin-left: auto; font-size: 0.85rem; }
+.photos-banner {
+  display: flex; align-items: center; gap: var(--oc-space-small); flex-wrap: wrap;
+  padding: var(--oc-space-small) var(--oc-space-medium); font-size: 0.85rem;
+  background: var(--oc-color-background-muted); color: var(--oc-color-text-muted);
+}
 .photos-error { padding: var(--oc-space-medium); color: var(--oc-color-swatch-danger-default); }
 .photos-empty {
   display: flex; flex-direction: column; align-items: center; gap: var(--oc-space-small);

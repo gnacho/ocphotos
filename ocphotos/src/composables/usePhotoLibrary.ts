@@ -69,6 +69,7 @@ const state = {
   error: ref<string | null>(null),
   root: ref<string>(''),
   rootMissing: ref(false),
+  fallbackFrom: ref<string | null>(null),
   space: ref<SpaceResource | null>(null),
   initialized: false
 }
@@ -112,12 +113,47 @@ export function usePhotoLibrary() {
     }
   }
 
-  /** Escaneo recursivo WebDAV (depth=1 por carpeta) de la raíz configurada. */
+  /** BFS WebDAV (depth=1 por carpeta) desde una raíz; informa si la raíz existía. */
+  const scanTree = async (space: SpaceResource, root: string) => {
+    const found: Photo[] = []
+    const queue = [root]
+    let folders = 0
+    let first = true
+    let rootOk = true
+    while (queue.length) {
+      const current = queue.shift()!
+      state.progress.value = `${folders} carpetas · ${found.length} fotos`
+      let children: Resource[] = []
+      try {
+        const res = await clientService.webdav.listFiles(space, { path: current })
+        children = res.children
+      } catch {
+        if (first) rootOk = false
+        first = false
+        continue
+      }
+      first = false
+      folders++
+      for (const c of children) {
+        if (c.type === 'folder') queue.push(c.path)
+        else {
+          const p = toPhoto(c)
+          if (p) found.push(p)
+        }
+      }
+    }
+    found.sort((a, b) => b.mtime - a.mtime)
+    return { found, rootOk }
+  }
+
+  /** Escanea la raíz configurada. Si esa carpeta no existe, cae a todo el espacio
+   *  personal para no dejar la app vacía (y la UI lo avisa). */
   const scan = async (root: string, force = false) => {
     if (state.loading.value) return
     state.loading.value = true
     state.error.value = null
     state.rootMissing.value = false
+    state.fallbackFrom.value = null
     try {
       const space = personalSpace.value
       if (!space) throw new Error('Espacio personal no disponible')
@@ -132,37 +168,22 @@ export function usePhotoLibrary() {
         }
       }
 
-      const found: Photo[] = []
-      const queue = [root]
-      let folders = 0
-      let first = true
-      while (queue.length) {
-        const current = queue.shift()!
-        state.progress.value = `${folders} carpetas · ${found.length} fotos`
-        let children: Resource[] = []
-        try {
-          const res = await clientService.webdav.listFiles(space, { path: current })
-          children = res.children
-        } catch {
-          // una raíz inaccesible se distingue de una raíz vacía para la UI
-          if (first) state.rootMissing.value = true
-          first = false
-          continue
-        }
-        first = false
-        folders++
-        for (const c of children) {
-          if (c.type === 'folder') queue.push(c.path)
-          else {
-            const p = toPhoto(c)
-            if (p) found.push(p)
-          }
+      let { found, rootOk } = await scanTree(space, root)
+      let effectiveRoot = root
+
+      if (!rootOk) {
+        state.rootMissing.value = true
+        if (root !== '') {
+          // la carpeta pedida no existe: escaneamos el espacio completo
+          state.fallbackFrom.value = root
+          ;({ found } = await scanTree(space, ''))
+          effectiveRoot = ''
         }
       }
-      found.sort((a, b) => b.mtime - a.mtime)
+
       state.photos.value = found
-      state.root.value = root
-      saveCache(root, found)
+      state.root.value = effectiveRoot
+      saveCache(effectiveRoot, found)
     } catch (e: any) {
       state.error.value = e?.message ?? String(e)
     } finally {
@@ -283,6 +304,7 @@ export function usePhotoLibrary() {
     error: state.error,
     root: state.root,
     rootMissing: state.rootMissing,
+    fallbackFrom: state.fallbackFrom,
     days,
     onThisDay,
     init,

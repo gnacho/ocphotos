@@ -12,7 +12,8 @@ sobre el skeleton oficial. Sin iframe, sin tokens propios: usa la **sesión del 
 - Indexado por **WebDAV con la sesión del usuario** (PROPFIND recursivo desde una
   carpeta raíz). La raíz por defecto es `/Fotos` y se cambia desde el **selector
   de carpeta** de la propia app (se recuerda por navegador en localStorage) o con
-  `ocphotos.config.rootPath` en `apps.yaml`.
+  `ocphotos.config.rootPath` en `apps.yaml`. Si la raíz no existe, escanea todo el
+  espacio personal y lo avisa con un banner.
 - Caché de la lista en localStorage (6 h) + botón de rescan.
 - Registrada en el **conmutador de aplicaciones** (appMenuItem).
 
