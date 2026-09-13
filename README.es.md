@@ -37,4 +37,4 @@ npm run dev
 
 ## Licencia
 
-Repositorio privado. Sin licencia concedida.
+GNU Affero General Public License v3.0 (AGPL-3.0-only). Ver [LICENSE](LICENSE).
