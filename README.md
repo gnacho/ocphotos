@@ -83,7 +83,7 @@ and the service validates it against OpenCloud's Graph `/me` (single-tenant: onl
 | `ocphotos/` | Native OpenCloud web extension (Vue 3 + extension-sdk) |
 | `app/` | Standalone PWA prototype (React 19 + Vite + Tailwind + shadcn/ui) |
 | `app/server-go/` | Go photo service: DAV/Graph client, index, EXIF, thumbnails, pHash, geocoding, REST API |
-| `deploy/` | Deployment notes for cloud.example.com |
+| `deploy/` | Deployment notes for a native OpenCloud instance |
 
 ## Development
 

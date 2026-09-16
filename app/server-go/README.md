@@ -29,12 +29,12 @@ OpenCloud como **fallback** cuando el preview del host falla (HEIC). Auth: el
 Bearer de la sesión web (validado contra Graph `/me`) o el `MEMORIES_TOKEN`.
 El servicio es **single-tenant**: solo atiende a la sesión de su usuario.
 
-## Despliegue en cloud.example.com (systemd, the OpenCloud container)
+## Despliegue en una instancia OpenCloud (systemd)
 
 Binario estático (`CGO_ENABLED=0`), usuario `ocphotos`, `/var/lib/ocphotos`,
-env `/etc/ocphotos/env`, unit `ocphotos.service`, puerto **:8097**. Expuesto
-como `https://cloud.example.com/ocphotos-api/` (location NPM en el the vhost,
-con `proxy_pass .../` para quitar el prefijo). Ver `deploy/README.md`.
+env `/etc/ocphotos/env`, unit `ocphotos.service`, puerto **:8097**. Se expone
+bajo `/ocphotos-api/` en el proxy inverso (`proxy_pass .../` para quitar el
+prefijo). Ver `deploy/README.md`.
 
 ## Despliegue (Docker, alternativa)
 

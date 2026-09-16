@@ -22,7 +22,7 @@ independiente que habla con OpenCloud por WebDAV/Graph/OIDC, la misma forma que 
 | `ocphotos/` | Extensión web nativa de OpenCloud (Vue 3 + extension-sdk): timeline, visor, recuerdos |
 | `app/` | Prototipo PWA independiente: React 19 + TypeScript + Vite + Tailwind + shadcn/ui |
 | `app/server-go/` | Servicio de fotos Go: cliente WebDAV/Graph, índice incremental, EXIF, miniaturas, SQLite, API REST |
-| `deploy/` | Notas de despliegue en cloud.example.com |
+| `deploy/` | Notas de despliegue en una instancia OpenCloud |
 
 ## Estado
 

@@ -1,8 +1,8 @@
-# Deployment: cloud.example.com
+# Deployment: native OpenCloud instance
 
-ocphotos is a native OpenCloud web extension. It is installed on the drive
-instance (the OpenCloud container, the Proxmox node) and served by the OpenCloud web service; it uses the
-host session, so it needs no app tokens of its own.
+ocphotos is a native OpenCloud web extension. It is installed on an OpenCloud
+instance and served by the OpenCloud web service; it uses the host session, so
+it needs no app tokens of its own.
 
 ## Build
 
@@ -45,11 +45,9 @@ break the module federation manifest. Backups go outside `assets/apps/`
 ## URL routing
 
 The extension is served under `/ocphotos` by the OpenCloud single-page app.
-There must be no Nginx Proxy Manager `location` for `/ocphotos`: NPM proxies
-everything to the OpenCloud web service, which resolves the app route. The
-earlier static PWA location was removed on 2026-09-13 (backup
-`vhost.conf.bak-native` on the proxy host, the proxy container); if the host is
-regenerated from the NPM panel, just do not re-add it.
+Do not add a reverse-proxy `location` for `/ocphotos`: the proxy must forward
+everything to the OpenCloud web service, which resolves the app route. A static
+PWA location would shadow the native app route, so keep it out of the vhost.
 
 The app registers itself in the app switcher as `app.ocphotos.menuItem`.
 
@@ -80,14 +78,13 @@ OpenCloud's thumbnails service does not decode HEIC (only png/jpg/gif/tiff/bmp),
 so the extension falls back to the `photos-service`, which decodes HEIC/HEIF with
 a pure-Go decoder (`gen2brain/h265`, no CGo, no libvips).
 
-- Host: the OpenCloud container, static binary at `/usr/local/bin/photos-service`, system user
+- Host: static binary at `/usr/local/bin/photos-service`, system user
   `ocphotos`, data in `/var/lib/ocphotos`, env in `/etc/ocphotos/env` (640),
   unit `ocphotos.service`, port `:8097`.
 - Env: `OC_BASE_URL=http://127.0.0.1:9200`, `OC_USER`, `OC_APP_TOKEN`,
   `MEMORIES_TOKEN`, `SCAN_ROOT=Fotos`, `SCAN_EVERY=30m`, `DATA_DIR`.
-- Exposed by NPM (the vhost on the proxy host) as `/ocphotos-api/` ->
-  `http://service-host:8097/` (trailing slash strips the prefix). Backup of the
-  vhost: `vhost.conf.bak-api`.
+- Exposed by the reverse proxy as `/ocphotos-api/` ->
+  `http://<service-host>:8097/` (trailing slash strips the prefix).
 - The extension calls `/ocphotos-api/api/thumb?path=/Fotos/x.heic&w=400&etag=...`
   with the host session Bearer. The service validates it against Graph `/me` and
   only answers for its own user (single-tenant).
