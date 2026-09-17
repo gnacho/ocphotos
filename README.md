@@ -5,8 +5,8 @@ A Memories-style photo experience for [OpenCloud](https://opencloud.eu): a date 
 source of truth for the files.
 
 It is a **native OpenCloud web extension** (Vue 3 + extension-sdk, session-based, no iframe)
-plus a **Go photo service** that keeps the metadata index (EXIF, GPS, tags, albums, hashes)
-and generates thumbnails, including HEIC.
+plus a **Go photo service** (part of [ocapps](https://github.com/gnacho/ocapps)) that keeps
+the metadata index (EXIF, GPS, tags, albums, hashes) and generates thumbnails, including HEIC.
 
 ## Screenshots
 
@@ -51,39 +51,76 @@ and generates thumbnails, including HEIC.
 - **Duplicates**: perceptual hashes (dHash) to find near-identical photos.
 - **Archive**: hide photos from the timeline and keep them in their own view.
 - **Videos**: posters generated with ffmpeg (the timeline shows a real frame) and playback
-  via a **signed same-origin URL with HTTP Range** streaming. (HLS transcoding is implemented
-  in the service but the host CSP blocks `blob:`, so progressive playback is used instead.)
+  via a **signed same-origin URL with HTTP Range** streaming.
 - **Favorites**, **auto-sync** (new photos show up on their own) and **HEIC/HEIF** support
   (pure-Go decoder in the service).
 - **Native navigation**: the sections live in OpenCloud's left sidebar (`navItems`), and the
   UI is translated to Spanish (`l10n/translations.json`, follows the host language).
+- **Multi-user**: each OpenCloud account has its own photo library. The first time a user
+  opens the app, their photos are indexed on demand. Background scanning is supported via
+  app-tokens (see [ocapps](https://github.com/gnacho/ocapps) docs).
 
 ## Architecture
 
 ```
-OpenCloud (source of truth: files in the personal space)
-   |  WebDAV + Graph + OIDC session
-   v
-photos-service (Go, SQLite)  ──  index (EXIF, GPS, tags, albums, pHash), thumbnails, REST API
-   ^  /ocphotos-api/ (same origin, Nginx Proxy Manager)
-   |
-ocphotos extension (Vue 3)  ──  timeline, on this day, explore, albums, places, tags,
+OpenCloud (source of truth: files in each user's personal space)
+    |  WebDAV + Graph + OIDC session (per user)
+    v
+ocapps backend (Go, SQLite)  --  index per user (EXIF, GPS, tags, albums, pHash), thumbnails, REST API
+    ^  /ocphotos-api/ (same origin, reverse proxy)
+    |
+ocphotos extension (Vue 3)  --  timeline, on this day, explore, albums, places, tags,
                                 folders, map, duplicates, archive, favorites, viewer
 ```
 
 The extension never stores credentials: it calls the service with the host session bearer,
-and the service validates it against OpenCloud's Graph `/me` (single-tenant: only its own user).
+and the service validates it against OpenCloud's Graph `/me`. Each user gets their own
+isolated index (scoped by `oc_id`).
 
-## Layout
+## Install
 
-| Path | What it is |
-|---|---|
-| `plan.md` | Short plan for the feasibility analysis |
-| `analisis-fotos-opencloud.md` / `.docx` | Full feasibility study (Spanish) |
-| `ocphotos/` | Native OpenCloud web extension (Vue 3 + extension-sdk) |
-| `app/` | Standalone PWA prototype (React 19 + Vite + Tailwind + shadcn/ui) |
-| `app/server-go/` | Go photo service: DAV/Graph client, index, EXIF, thumbnails, pHash, geocoding, REST API |
-| `deploy/` | Deployment notes for a native OpenCloud instance |
+### The easy way (OpenCloud App Store)
+
+Download the latest release zip from the [releases page](https://github.com/gnacho/ocphotos/releases):
+
+```bash
+# Download ocphotos-X.Y.Z.zip and extract to your OpenCloud apps folder
+# (commonly /var/lib/opencloud/web/assets/apps or /etc/opencloud/web/assets/apps)
+```
+
+Add to `/etc/opencloud/apps.yaml`:
+
+```yaml
+ocphotos:
+  config: {}
+```
+
+Restart OpenCloud. The ocphotos app appears in the app switcher.
+
+### Build from source
+
+```bash
+cd ocphotos
+pnpm install && pnpm build
+```
+
+Copy `dist/` to the OpenCloud apps folder as `ocphotos/`.
+
+### Backend (ocapps)
+
+The backend lives in the [ocapps](https://github.com/gnacho/ocapps) repo.
+See its `deploy/README.md` for the full installation guide (systemd,
+environment variables, reverse proxy snippets).
+
+Quick reference for the proxy:
+
+```nginx
+location /ocphotos-api/ {
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://127.0.0.1:8096;
+}
+```
 
 ## Development
 
@@ -93,11 +130,6 @@ cd ocphotos
 pnpm install
 pnpm build        # pnpm build:w to watch
 pnpm check:types
-
-# Go service
-cd app/server-go
-go test ./...
-go build ./cmd/photos-service
 ```
 
 ## License
