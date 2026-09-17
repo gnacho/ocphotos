@@ -20,7 +20,21 @@ export default defineWebApplication({
       id: 'ocphotos',
       name: $gettext('Photos'),
       icon: 'image',
-      color: '#0ea5e9'
+      color: '#0ea5e9',
+      // "Abrir con" en Files para imágenes y vídeos. routeName va prefijado con
+      // el appId por el host, así que aquí se declara el nombre ya prefijado.
+      extensions: [
+        {
+          mimeType: 'image',
+          routeName: 'ocphotos-photos-viewer',
+          label: $gettext('Photos')
+        },
+        {
+          mimeType: 'video',
+          routeName: 'ocphotos-photos-viewer',
+          label: $gettext('Photos')
+        }
+      ]
     }
 
     const routes: RouteRecordRaw[] = [
@@ -125,6 +139,16 @@ export default defineWebApplication({
         meta: {
           authContext: 'user',
           title: $gettext('Favorites')
+        }
+      },
+      {
+        // destino de "Abrir con" (Files): recibe el fichero por ruta y fileId
+        path: '/:driveAliasAndItem(.*)?',
+        name: 'photos-viewer',
+        component: () => import('./views/FileOpenView.vue'),
+        meta: {
+          authContext: 'user',
+          title: $gettext('Photos')
         }
       }
     ]
