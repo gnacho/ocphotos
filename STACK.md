@@ -81,11 +81,21 @@ ocnews side of ocapps); plan a replacement when it bites.
 
 ### Standalone variant (`app/`)
 
-Held back on several majors (maintenance mode): Tailwind 3 -> 4,
-react-router 7 -> 8, Vite 7 -> 8, recharts 2 -> 3, ESLint 9 -> 10,
-lucide-react 0.x -> 1.x, react-day-picker 9 -> 10, `@types/node` 24 -> 26.
-Backend (`app/server-go/`): modernc.org/sqlite 1.38 -> 1.60, x/image 0.30 ->
-0.46, h265 0.2.2 -> 0.2.3, x/sys, x/text, x/exp.
+Migrated to current majors on 2026-10-05: Tailwind CSS 4 (via
+`@tailwindcss/vite`, no PostCSS), Vite 8, react-router 8, recharts 3,
+lucide-react 1.x, react-day-picker 10, ESLint 10, `@types/node` 26, and the
+latest patch lines of zod, react-hook-form, react-resizable-panels and
+embla-carousel.
+
+Held back: TypeScript 5.9.3, because typescript-eslint 8.71 peer-requires
+`typescript < 6.1`. Revisit when typescript-eslint adds TS 7 support.
+
+The Tailwind 4 migration also removed the whole Tailwind 3 toolchain chain,
+which is the only fix for the braces stack-exhaustion advisory
+(GHSA-vfj7-8cjw-p6xm, no patched release): `npm audit` in `app/` now reports
+zero vulnerabilities. `app/server-go/`: modernc.org/sqlite 1.38 -> 1.60,
+x/image 0.30 -> 0.46, h265 0.2.2 -> 0.2.3 available (dependabot handles Go
+updates via PR, e.g. x/image 0.41.0 landed in #7).
 
 ## Security notes (Dependabot)
 
@@ -104,12 +114,9 @@ Resolved 2026-10-05 (now zero open alerts):
   dismissed as not used.
 - `golang.org/x/image 0.30.0` in `app/server-go`: bumped to 0.41.0 (#7).
 
-Known, not fixable without a migration: the Tailwind 3 chain in `app/`
-(chokidar, fast-glob, micromatch) pulls `braces`, which has a stack-exhaustion
-DoS advisory (GHSA-vfj7-8cjw-p6xm) with **no patched release** (latest 3.0.3 is
-still in the vulnerable `*` range). Dependabot does not flag it for that
-reason; `npm audit` in `app/` does. Only cure is migrating `app/` to Tailwind
-4, which is deferred while the standalone variant stays in maintenance mode.
+Resolved by the Tailwind 4 migration (#11): the Tailwind 3 toolchain is
+gone from `app/`, so the `braces` advisory chain no longer applies and
+`npm audit` in `app/` reports zero vulnerabilities.
 
 ## License
 
