@@ -1,7 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Album, ConnectionState, DayBucket, Person, PhotoAsset, View } from './types'
 import { generateDemoData } from './demoData'
 import { OpenCloudClient, entriesToAssets } from './opencloud'
+import type { DavEntry } from './opencloud'
+import { groupByDay } from './groupByDay'
+import { StoreCtx } from '@/hooks/useStore'
 
 /**
  * Tres modos de datos:
@@ -56,7 +59,7 @@ function svcToAsset(a: ServiceAsset, token: string): PhotoAsset {
   }
 }
 
-interface Store {
+export interface Store {
   assets: PhotoAsset[]
   people: Person[]
   albums: Album[]
@@ -83,26 +86,6 @@ interface Store {
   loadingMore: boolean
   stats: Record<string, number> | null
   serviceToken: string
-}
-
-const Ctx = createContext<Store | null>(null)
-
-export function useStore() {
-  const s = useContext(Ctx)
-  if (!s) throw new Error('store missing')
-  return s
-}
-
-export function groupByDay(assets: PhotoAsset[]): DayBucket[] {
-  const map = new Map<string, PhotoAsset[]>()
-  for (const a of assets) {
-    const key = `${a.takenAt.getFullYear()}-${String(a.takenAt.getMonth() + 1).padStart(2, '0')}-${String(a.takenAt.getDate()).padStart(2, '0')}`
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(a)
-  }
-  return Array.from(map.entries())
-    .sort(([a], [b]) => (a < b ? 1 : -1))
-    .map(([key, list]) => ({ key, date: list[0].takenAt, assets: list }))
 }
 
 const STORED = 'ocm-connection'
@@ -180,8 +163,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cursorRef.current = null
       await loadPage(token, true)
       setConnection({ mode: 'opencloud', baseUrl: window.location.origin, username: '', appToken: '', status: 'ok', message: `photos-service: ${st.assets} fotos indexadas` })
-    } catch (e: any) {
-      setConnection((c) => ({ ...c, status: 'error', message: e?.message ?? 'No se pudo conectar con el servicio' }))
+    } catch (e: unknown) {
+      setConnection((c) => ({ ...c, status: 'error', message: e instanceof Error ? e.message : 'No se pudo conectar con el servicio' }))
     }
   }, [svcFetch, loadPage])
 
@@ -250,7 +233,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const drives = await client.listDrives()
       const personal = drives.find((d) => d.driveType === 'personal') ?? drives[0]
       if (!personal) throw new Error('No se encontró ningún espacio')
-      const items: { path: string; entry: any }[] = []
+      const items: { path: string; entry: DavEntry }[] = []
       let root = 'Fotos'
       try {
         await client.listFolder(personal.webdavUrl, root)
@@ -268,11 +251,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const next: ConnectionState = { mode: 'opencloud', baseUrl, username, appToken, status: 'ok', message: `${real.length} fotos indexadas desde ${personal.name}` }
       setConnection(next)
       localStorage.setItem(STORED, JSON.stringify({ mode: 'opencloud', baseUrl, username, appToken }))
-    } catch (e: any) {
+    } catch (e: unknown) {
       setConnection((c) => ({
         ...c,
         status: 'error',
-        message: `${e?.message ?? 'Error de conexión'} — ¿CORS habilitado en OpenCloud? (OC_CORS_ALLOW_ORIGINS)`,
+        message: `${e instanceof Error ? e.message : 'Error de conexión'} — ¿CORS habilitado en OpenCloud? (OC_CORS_ALLOW_ORIGINS)`,
       }))
     }
   }, [])
@@ -296,5 +279,5 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mode, hasMore, loadMore, loadingMore, stats, serviceToken,
   }
 
-  return <Ctx.Provider value={store}>{children}</Ctx.Provider>
+  return <StoreCtx.Provider value={store}>{children}</StoreCtx.Provider>
 }

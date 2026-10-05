@@ -20,4 +20,13 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // shadcn-style ui wrappers intentionally co-locate variant helpers
+    // (buttonVariants, badgeVariants, ...) with their components; fast
+    // refresh is a dev-server nicety and irrelevant for a built SPA.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

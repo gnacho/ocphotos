@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Heart, Play } from 'lucide-react'
 import type { DayBucket, PhotoAsset } from '@/lib/types'
-import { useStore } from '@/lib/store'
+import { useStore } from '@/hooks/useStore'
 
 const fmtDay = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 

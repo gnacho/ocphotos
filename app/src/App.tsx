@@ -1,4 +1,5 @@
-import { StoreProvider, useStore } from '@/lib/store'
+import { StoreProvider } from '@/lib/store'
+import { useStore } from '@/hooks/useStore'
 import Shell from '@/components/Shell'
 import Timeline from '@/components/Timeline'
 import Viewer from '@/components/Viewer'
