@@ -87,23 +87,29 @@ lucide-react 0.x -> 1.x, react-day-picker 9 -> 10, `@types/node` 24 -> 26.
 Backend (`app/server-go/`): modernc.org/sqlite 1.38 -> 1.60, x/image 0.30 ->
 0.46, h265 0.2.2 -> 0.2.3, x/sys, x/text, x/exp.
 
-## Security notes (Dependabot, 2026-10-05)
+## Security notes (Dependabot)
 
-All current alerts on this repo are **development** scope and come from
+All former alerts on this repo were development-scope and came from
 `@module-federation/dts-plugin` (a build-time type-generation plugin in the
-extension SDK toolchain), which pins `axios 1.13.5` and `adm-zip 0.5.18`:
+extension SDK toolchain), which pins `axios 1.13.5` and `adm-zip 0.5.18`.
+Resolved 2026-10-05 (now zero open alerts):
 
-- `axios 1.13.5`: several prototype-pollution / proxy-leak advisories, fixed
-  in 1.15.1+ / 1.16.0+ / 1.18.0+. The runtime copy in the lockfile is 1.20.0;
-  only this dts-plugin copy is old.
-- `adm-zip 0.5.18`: extraction advisories, fixed in 0.6.1. dts-plugin reads
-  zips at build time; it does not extract untrusted archives.
-- `ws`: one alert against `ws < 5.2.5` but the lockfile only has 8.x copies;
-  stale, expected to auto-close on re-scan.
-- `dompurify`: alert covered `<= 3.4.15`; fixed by bumping to 3.4.16 (#1).
+- `axios 1.13.5`: prototype-pollution / proxy-leak advisories. Fixed via pnpm
+  overrides (`axios ^1.20.0`), the lockfile now carries a single clean copy.
+- `adm-zip 0.5.18`: extraction advisories, fixed in 0.6.1. Fixed via pnpm
+  overrides (`adm-zip ^0.6.1`).
+- `brace-expansion 5.0.9`: quadratic-time expansion DoS, fixed in 5.0.12.
+  Bumped in both lockfiles (`app/` via npm audit fix, extension via override).
+- `ws`: alert covered `ws < 5.2.5` but the lockfile only has 8.x copies;
+  dismissed as not used.
+- `golang.org/x/image 0.30.0` in `app/server-go`: bumped to 0.41.0 (#7).
 
-Planned: force `axios >= 1.20` and `adm-zip >= 0.6.1` via pnpm overrides so
-the vulnerable copies stop resolving (tracked in #4).
+Known, not fixable without a migration: the Tailwind 3 chain in `app/`
+(chokidar, fast-glob, micromatch) pulls `braces`, which has a stack-exhaustion
+DoS advisory (GHSA-vfj7-8cjw-p6xm) with **no patched release** (latest 3.0.3 is
+still in the vulnerable `*` range). Dependabot does not flag it for that
+reason; `npm audit` in `app/` does. Only cure is migrating `app/` to Tailwind
+4, which is deferred while the standalone variant stays in maintenance mode.
 
 ## License
 
