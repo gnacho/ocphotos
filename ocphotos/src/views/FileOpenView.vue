@@ -15,7 +15,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouteParam, useRouteQuery, useRouter } from '@opencloud-eu/web-pkg'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
@@ -23,7 +23,11 @@ export default defineComponent({
   name: 'FileOpenView',
   components: { ViewerOverlay },
   setup() {
-    const route = useRoute()
+    // los composables de vue-router crudos no resuelven contra la instancia del
+    // router del host dentro de la app federada: hay que usar los de web-pkg
+    // (E2E drive.domatix.cloud: crash "reading 'params'" con useRoute()).
+    const driveAliasAndItem = useRouteParam('driveAliasAndItem', '')
+    const fileId = useRouteQuery('fileId', '')
     const router = useRouter()
     const { resolveFromFiles, ensurePreview, ensureOriginal } = usePhotoLibrary()
 
@@ -39,11 +43,10 @@ export default defineComponent({
     }
 
     onMounted(async () => {
-      const driveAliasAndItem =
-        typeof route.params.driveAliasAndItem === 'string' ? route.params.driveAliasAndItem : ''
-      const fileId = typeof route.query.fileId === 'string' ? route.query.fileId : undefined
+      const dai = typeof driveAliasAndItem.value === 'string' ? driveAliasAndItem.value : ''
+      const fid = typeof fileId.value === 'string' && fileId.value ? fileId.value : undefined
       try {
-        photo.value = await resolveFromFiles(driveAliasAndItem, fileId)
+        photo.value = await resolveFromFiles(dai, fid)
       } finally {
         loading.value = false
       }
