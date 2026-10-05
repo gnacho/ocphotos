@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarClock, FolderOpen, Heart, Sparkles, Users } from 'lucide-react'
-import { useStore } from '@/lib/store'
-import type { PhotoAsset } from '@/lib/types'
+import { useStore } from '@/hooks/useStore'
+import type { ApiAsset, PhotoAsset } from '@/lib/types'
 
 function Grid({ assets, empty }: { assets: PhotoAsset[]; empty: string }) {
   const { openViewer } = useStore()
@@ -22,22 +22,29 @@ export function Recuerdos() {
   const { assets, openViewer, mode, serviceToken } = useStore()
   const [svcAssets, setSvcAssets] = useState<PhotoAsset[] | null>(null)
 
+  // reset al cambiar de modo durante el render (patrón "adjust state during render")
+  const [prevMode, setPrevMode] = useState(mode)
+  if (prevMode !== mode) {
+    setPrevMode(mode)
+    setSvcAssets(null)
+  }
+
   useEffect(() => {
-    if (mode !== 'service') { setSvcAssets(null); return }
+    if (mode !== 'service') return
     fetch('/api/memories/on-this-day', { headers: serviceToken ? { Authorization: `Bearer ${serviceToken}` } : {} })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j) => setSvcAssets((j.assets ?? []).map((a: any) => ({
+      .then((j: { assets?: ApiAsset[] }) => setSvcAssets((j.assets ?? []).map((a) => ({
         id: String(a.id), path: a.path, filename: a.filename,
         takenAt: new Date(a.takenAt * 1000), width: a.width || 1600, height: a.height || 1200,
         thumbUrl: `/api/assets/${a.id}/thumb?w=400${serviceToken ? `?token=${encodeURIComponent(serviceToken)}` : ''}`,
         fullUrl: `/api/assets/${a.id}/original${serviceToken ? `?token=${encodeURIComponent(serviceToken)}` : ''}`,
-        isVideo: a.mediaType === 'video', personIds: [], favorite: a.favorite,
+        isVideo: a.mediaType === 'video', personIds: [], favorite: a.favorite ?? false,
       }))))
       .catch(() => setSvcAssets([]))
   }, [mode, serviceToken])
 
-  const source = mode === 'service' ? (svcAssets ?? []) : assets
   const memories = useMemo(() => {
+    const source = mode === 'service' ? (svcAssets ?? []) : assets
     const now = new Date()
     const groups = new Map<number, PhotoAsset[]>()
     for (const a of source) {
@@ -48,7 +55,7 @@ export function Recuerdos() {
       }
     }
     return Array.from(groups.entries()).sort(([a], [b]) => b - a)
-  }, [source])
+  }, [mode, svcAssets, assets])
 
   if (memories.length === 0)
     return (

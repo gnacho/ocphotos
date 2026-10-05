@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useStore } from '@/lib/store'
+import { useStore } from '@/hooks/useStore'
+import type { ApiAsset, PhotoAsset } from '@/lib/types'
 
 export default function MapView() {
   const { filteredAssets, openViewer, mode, serviceToken } = useStore()
@@ -61,24 +62,42 @@ export default function MapView() {
   )
 }
 
-function useGeoAssets(mode: string, token: string, fallback: { lat?: number; lon?: number }[]) {
-  const [svc, setSvc] = useState<any[] | null>(null)
+/** geo asset del API del servicio (ApiAsset + coordenadas) */
+type GeoApiAsset = ApiAsset & { lat?: number; lon?: number; place?: string }
+
+function useGeoAssets(mode: string, token: string, fallback: PhotoAsset[]) {
+  const [svc, setSvc] = useState<GeoApiAsset[] | null>(null)
+
+  // reset al cambiar de modo durante el render (patrón "adjust state during render")
+  const [prevMode, setPrevMode] = useState(mode)
+  if (prevMode !== mode) {
+    setPrevMode(mode)
+    setSvc(null)
+  }
+
   useEffect(() => {
-    if (mode !== 'service') { setSvc(null); return }
+    if (mode !== 'service') return
     fetch('/api/geo', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j) => setSvc(j.assets ?? []))
+      .then((j: { assets?: GeoApiAsset[] }) => setSvc(j.assets ?? []))
       .catch(() => setSvc([]))
   }, [mode, token])
   if (mode === 'service') {
-    return (svc ?? []).map((a: any) => ({
-      ...a,
+    return (svc ?? []).map((a): PhotoAsset => ({
       id: String(a.id),
+      path: a.path,
+      filename: a.filename,
       takenAt: new Date(a.takenAt * 1000),
+      width: a.width || 1600,
+      height: a.height || 1200,
       thumbUrl: `/api/assets/${a.id}/thumb?w=100${token ? `?token=${encodeURIComponent(token)}` : ''}`,
       fullUrl: `/api/assets/${a.id}/original${token ? `?token=${encodeURIComponent(token)}` : ''}`,
       personIds: [],
       isVideo: a.mediaType === 'video',
+      favorite: a.favorite ?? false,
+      lat: a.lat,
+      lon: a.lon,
+      place: a.place,
     }))
   }
   return fallback

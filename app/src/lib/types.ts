@@ -61,3 +61,15 @@ export interface ConnectionState {
   status: 'idle' | 'connecting' | 'ok' | 'error'
   message?: string
 }
+
+/** forma de un asset tal como viene del API del photos-service */
+export interface ApiAsset {
+  id: number | string
+  path: string
+  filename: string
+  takenAt: number
+  width?: number
+  height?: number
+  mediaType?: string
+  favorite?: boolean
+}

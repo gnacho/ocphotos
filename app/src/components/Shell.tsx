@@ -20,7 +20,7 @@ function useTheme(): [Theme, () => void] {
   }, [theme])
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))]
 }
-import { useStore } from '@/lib/store'
+import { useStore } from '@/hooks/useStore'
 import type { View } from '@/lib/types'
 
 const NAV: { id: View; label: string; icon: typeof Images }[] = [

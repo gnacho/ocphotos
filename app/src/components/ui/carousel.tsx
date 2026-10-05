@@ -93,6 +93,7 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial embla sync: selectedScrollSnap() must be read once after mount
     onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)

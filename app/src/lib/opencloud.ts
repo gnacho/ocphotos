@@ -60,11 +60,17 @@ export class OpenCloudClient {
     if (!res.ok) throw new Error(`Graph API respondió ${res.status}`)
     const json = await res.json()
     if (!Array.isArray(json?.value)) throw new Error('Respuesta inesperada de /me/drives')
-    return json.value.map((d: any) => ({
+    type GraphDrive = {
+      id: string
+      name: string
+      driveType: string
+      root?: { webDavUrl?: string }
+    }
+    return (json.value as GraphDrive[]).map((d) => ({
       id: d.id,
       name: d.name,
       driveType: d.driveType,
-      webdavUrl: d.root?.webDavUrl,
+      webdavUrl: d.root?.webDavUrl ?? '',
     }))
   }
 

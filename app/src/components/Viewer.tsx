@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, Heart, Info, MapPin, X } from 'lucide-react'
-import { useStore } from '@/lib/store'
+import { useStore } from '@/hooks/useStore'
 
 export default function Viewer() {
   const { viewerList, viewerIndex, closeViewer, openViewer, toggleFavorite, people } = useStore()
