@@ -473,6 +473,25 @@ export function usePhotoLibrary() {
     return (json.assets ?? []).map(toPhoto)
   }
 
+  /**
+   * Resuelve un asset a partir del contexto de "Abrir con" de Files.
+   * driveAliasAndItem = "personal/Fotos/IMG.jpg"; fileId = id de OpenCloud.
+   * Espera `GET /api/assets/resolve?driveAliasAndItem=...&fileId=...` ->
+   * `{ asset: <Asset> }` (404 si el fichero no está indexado). Devuelve null
+   * si el backend no puede resolverlo (endpoint aún por implementar en ocapps).
+   */
+  const resolveFromFiles = async (driveAliasAndItem: string, fileId?: string): Promise<Photo | null> => {
+    const q = new URLSearchParams({ driveAliasAndItem })
+    if (fileId) q.set('fileId', fileId)
+    try {
+      const res = await api(`/api/assets/resolve?${q.toString()}`)
+      const json = (await res.json()) as { asset?: ApiAsset }
+      return json.asset ? toPhoto(json.asset) : null
+    } catch {
+      return null
+    }
+  }
+
   return {
     photos: state.photos,
     loading: state.loading,
@@ -496,6 +515,7 @@ export function usePhotoLibrary() {
     fetchOnThisDay,
     fetchHighlights,
     fetchFavorites,
+    resolveFromFiles,
     fetchAlbums,
     createAlbum,
     renameAlbum,
