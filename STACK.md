@@ -87,6 +87,24 @@ lucide-react 0.x -> 1.x, react-day-picker 9 -> 10, `@types/node` 24 -> 26.
 Backend (`app/server-go/`): modernc.org/sqlite 1.38 -> 1.60, x/image 0.30 ->
 0.46, h265 0.2.2 -> 0.2.3, x/sys, x/text, x/exp.
 
+## Security notes (Dependabot, 2026-10-05)
+
+All current alerts on this repo are **development** scope and come from
+`@module-federation/dts-plugin` (a build-time type-generation plugin in the
+extension SDK toolchain), which pins `axios 1.13.5` and `adm-zip 0.5.18`:
+
+- `axios 1.13.5`: several prototype-pollution / proxy-leak advisories, fixed
+  in 1.15.1+ / 1.16.0+ / 1.18.0+. The runtime copy in the lockfile is 1.20.0;
+  only this dts-plugin copy is old.
+- `adm-zip 0.5.18`: extraction advisories, fixed in 0.6.1. dts-plugin reads
+  zips at build time; it does not extract untrusted archives.
+- `ws`: one alert against `ws < 5.2.5` but the lockfile only has 8.x copies;
+  stale, expected to auto-close on re-scan.
+- `dompurify`: alert covered `<= 3.4.15`; fixed by bumping to 3.4.16 (#1).
+
+Planned: force `axios >= 1.20` and `adm-zip >= 0.6.1` via pnpm overrides so
+the vulnerable copies stop resolving (tracked in #4).
+
 ## License
 
 GNU Affero General Public License v3.0 (AGPL-3.0-only). See [LICENSE](LICENSE).
