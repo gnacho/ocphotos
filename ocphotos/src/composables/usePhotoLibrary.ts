@@ -401,6 +401,19 @@ export function usePhotoLibrary() {
     await api(`/api/albums/${albumId}/assets/${assetId}`, { method: 'DELETE' })
   }
 
+  /**
+   * Álbumes que contienen un asset. No existe endpoint directo "álbumes de un
+   * asset", así que se cruzan /api/albums con /api/albums/{id}/assets. Si el
+   * número de álbumes creciera, convendría moverlo a un endpoint del backend.
+   */
+  const albumsOfAsset = async (id: number): Promise<Album[]> => {
+    const albums = await fetchAlbums()
+    const memberships = await Promise.all(
+      albums.map(async (a) => ({ album: a, has: (await albumAssets(a.id)).some((p) => p.id === id) }))
+    )
+    return memberships.filter((m) => m.has).map((m) => m.album)
+  }
+
   // --- Etiquetas ---
   const fetchTags = async (): Promise<Tag[]> => {
     const res = await api('/api/tags')
@@ -523,6 +536,7 @@ export function usePhotoLibrary() {
     albumAssets,
     addToAlbum,
     removeFromAlbum,
+    albumsOfAsset,
     fetchPlaces,
     placeAssets,
     fetchTags,

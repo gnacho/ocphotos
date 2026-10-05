@@ -21,6 +21,9 @@
         <button v-if="current" class="viewer-btn" :class="{ 'is-fav': tagsOpen }" :aria-label="$gettext('Add tag')" @click="toggleTags">
           <oc-icon name="price-tag-3" color="#fff" size="medium" />
         </button>
+        <button v-if="current" class="viewer-btn" :class="{ 'is-on': detailsOpen }" :aria-label="$gettext('Details')" @click="detailsOpen = !detailsOpen">
+          <oc-icon name="information" color="#fff" size="medium" />
+        </button>
         <button v-if="current" class="viewer-btn" :aria-label="$gettext('Archive')" @click="archive">
           <oc-icon name="archive-2" color="#fff" size="medium" />
         </button>
@@ -52,6 +55,8 @@
     </div>
 
     <album-picker v-if="pickerOpen && current" :asset-id="current.id" @close="pickerOpen = false" />
+
+    <photo-details-panel v-if="detailsOpen && current" :photo="current" @close="detailsOpen = false" />
   </div>
 </template>
 
@@ -60,10 +65,11 @@ import { computed, defineComponent, nextTick, onMounted, onUnmounted, PropType, 
 import type { ProcessorType } from '@opencloud-eu/web-pkg'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import AlbumPicker from './AlbumPicker.vue'
+import PhotoDetailsPanel from './PhotoDetailsPanel.vue'
 
 export default defineComponent({
   name: 'ViewerOverlay',
-  components: { AlbumPicker },
+  components: { AlbumPicker, PhotoDetailsPanel },
   props: {
     photos: { type: Array as PropType<Photo[]>, required: true },
     index: { type: Number, required: true },
@@ -84,6 +90,7 @@ export default defineComponent({
     const videoEl = ref<HTMLVideoElement | null>(null)
     const pickerOpen = ref(false)
     const tagsOpen = ref(false)
+    const detailsOpen = ref(false)
     const tags = ref<string[]>([])
     const newTag = ref('')
 
@@ -178,7 +185,7 @@ export default defineComponent({
     }
     onMounted(() => window.addEventListener('keydown', onKey))
     onUnmounted(() => window.removeEventListener('keydown', onKey))
-    return { root, current, src, videoEl, caption, download, onFavorite, archive, pickerOpen, tagsOpen, tags, newTag, toggleTags, submitTag, dropTag }
+    return { root, current, src, videoEl, caption, download, onFavorite, archive, pickerOpen, tagsOpen, detailsOpen, tags, newTag, toggleTags, submitTag, dropTag }
   }
 })
 </script>
@@ -204,6 +211,7 @@ export default defineComponent({
 }
 .viewer-btn:hover { background: rgba(255, 255, 255, 0.26); }
 .viewer-btn.is-fav { background: rgba(224, 49, 49, 0.75); }
+.viewer-btn.is-on { background: rgba(255, 255, 255, 0.34); }
 .viewer-close { background: rgba(255, 255, 255, 0.2); }
 .viewer-close:hover { background: rgba(255, 255, 255, 0.34); }
 .viewer-tags {

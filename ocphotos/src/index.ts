@@ -225,6 +225,19 @@ export default defineWebApplication({
 
     const extensions = ({ applicationConfig }: ApplicationSetupOptions) => {
       return computed<Extension[]>(() => {
+        // NOTA F3(c): los metadatos de la foto (EXIF/tags/álbumes) se muestran en
+        // un panel lateral PROPIO (PhotoDetailsPanel.vue, dentro de ViewerOverlay),
+        // no vía el extension point `sidebarPanel`. Motivo: `sidebarPanel` solo lo
+        // consume la sidebar derecha de Files (id "global.files.sidebar", ver
+        // FileSideBar en @opencloud-eu/web-pkg) y su contexto son recursos WebDAV
+        // (space/currentFolder/selectedResources), no el asset de la app. Para
+        // usarlo haría falta resolver path DAV -> id de asset, que es justo lo que
+        // aportará el endpoint pendiente GET /api/assets/resolve.
+        //
+        // Migración (cuando exista /api/assets/resolve): añadir aquí un
+        // SidebarPanelExtension cuyo `panel.component` sea PhotoDetailsPanel y cuyo
+        // `panel.componentAttrs` resuelva `items[0]` (WebDAV) a un Photo con
+        // resolveFromFiles() y lo pase como prop `photo`.
         const menuItems: AppMenuItemExtension[] = [
           {
             // registra la app en el conmutador de aplicaciones
