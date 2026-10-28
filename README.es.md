@@ -59,8 +59,8 @@ pnpm test:coverage
 
 La suite corre sobre Vitest con happy-dom. `pnpm test:coverage` añade el informe
 de cobertura de V8 y falla cuando los totales bajan de los umbrales declarados en
-`ocphotos/vitest.config.ts`: 75 % de sentencias, 58 % de ramas, 56 % de funciones
-y 78 % de líneas en el global, con suelos más altos para `src/composables/**` y
+`ocphotos/vitest.config.ts`: 85 % de sentencias, 72 % de ramas, 68 % de funciones
+y 87 % de líneas en el global, con suelos más altos para `src/composables/**` y
 `src/components/**`.
 
 PWA y servicio independientes:

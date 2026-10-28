@@ -143,8 +143,8 @@ pnpm test:coverage
 
 The suite runs on Vitest with happy-dom. `pnpm test:coverage` adds a V8 coverage
 report and fails when the totals drop below the thresholds declared in
-`ocphotos/vitest.config.ts`: 75 % statements, 58 % branches, 56 % functions and
-78 % lines overall, with stricter floors for `src/composables/**` and
+`ocphotos/vitest.config.ts`: 85 % statements, 72 % branches, 68 % functions and
+87 % lines overall, with stricter floors for `src/composables/**` and
 `src/components/**`.
 
 ```bash
