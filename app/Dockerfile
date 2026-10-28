@@ -3,25 +3,26 @@
 # Run:    ver docker-compose.yml
 
 # --- etapa 1: frontend ---
-FROM node:20-alpine AS web
+FROM node:24-alpine AS web
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY index.html vite.config.ts tsconfig*.json tailwind.config.js postcss.config.js components.json ./
+COPY index.html vite.config.ts tsconfig*.json components.json ./
 COPY public ./public
 COPY src ./src
 RUN npm run build
 
 # --- etapa 2: backend Go (SQLite Go puro → binario estático sin CGO) ---
-FROM golang:1.24-alpine AS server
+FROM golang:1.26-alpine AS server
 WORKDIR /build
 COPY server-go/go.mod server-go/go.sum ./
+COPY server-go/third_party ./third_party
 RUN go mod download
 COPY server-go ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /photos-service ./cmd/photos-service
 
 # --- etapa 3: runtime ---
-FROM alpine:3.21
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata && adduser -D -u 10001 memories
 COPY --from=server /photos-service /usr/local/bin/photos-service
 COPY --from=web /build/dist /app/web
