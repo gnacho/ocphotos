@@ -51,7 +51,7 @@ jobs:
         run: pnpm build
 
   app:
-    name: Standalone app (lint, build)
+    name: Standalone app (lint, tests, coverage, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -71,6 +71,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Unit tests and coverage
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build
