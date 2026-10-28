@@ -4,6 +4,10 @@ ocphotos is a native OpenCloud web extension. It is installed on an OpenCloud
 instance and served by the OpenCloud web service; it uses the host session, so
 it needs no app tokens of its own.
 
+To update an existing deployment, install the zip published with each tag, see
+[Install from a release](#install-from-a-release). The steps below build from
+source.
+
 ## Build
 
 ```bash
@@ -26,7 +30,7 @@ ocphotos:
 ```
 
 OpenCloud rebuilds the `external_apps` list in `config.json` at startup, so a
-restart is required after installing or replacing the app:
+restart is required after registering the app or changing `apps.yaml`:
 
 ```bash
 rm -rf /etc/opencloud/web/assets/apps/ocphotos
@@ -41,6 +45,63 @@ curl -s http://127.0.0.1:9200/config.json | jq '.external_apps'
 `manifest.json`. Remove the old app directory before the restart: stale chunks
 break the module federation manifest. Backups go outside `assets/apps/`
 (e.g. `/root/ocphotos.bak-<date>`).
+
+### Install from a release
+
+Every tag `ocphotos-v*` publishes `ocphotos-<version>.zip`, which already contains
+`ocphotos/` with `manifest.json`, `js/` and `assets/`. The app store consumes that
+artefact, so install the released zip instead of a local build:
+
+1. Back up the current directory outside `assets/apps/`, so the module federation
+   manifest never sees a stale copy:
+
+   ```bash
+   tar czf /root/ocphotos-app.bak-$(date +%Y%m%d).tgz \
+     -C /etc/opencloud/web/assets/apps ocphotos
+   ```
+
+2. Push the zip into the container and extract it there. Minimal images usually
+   have no `unzip`, but they do have Python:
+
+   ```bash
+   pct push <ctid> /root/ocphotos-<version>.zip /tmp/ocphotos.zip
+   pct exec <ctid> -- python3 -c \
+     "import zipfile; zipfile.ZipFile('/tmp/ocphotos.zip').extractall('/tmp/ocphotos-new')"
+   ```
+
+3. Swap the directory and leave it owned by the web service user:
+
+   ```bash
+   pct exec <ctid> -- sh -c 'rm -rf /etc/opencloud/web/assets/apps/ocphotos'
+   pct exec <ctid> -- mkdir -p /etc/opencloud/web/assets/apps/ocphotos
+   pct exec <ctid> -- sh -c 'cp -a /tmp/ocphotos-new/ocphotos/. /etc/opencloud/web/assets/apps/ocphotos/'
+   pct exec <ctid> -- chown -R 1000:1000 /etc/opencloud/web/assets/apps/ocphotos
+   ```
+
+4. Restart the web service and check what the instance serves:
+
+   ```bash
+   pct exec <ctid> -- systemctl restart opencloud
+   curl -s https://<host>/assets/apps/ocphotos/manifest.json | jq '.version, .entrypoint'
+   curl -s -o /dev/null -w '%{http_code}\n' \
+     https://<host>/assets/apps/ocphotos/js/<remoteEntry>
+   ```
+
+The manifest is a static file, so it reports the new version as soon as the files
+are in place. The restart is what rebuilds `external_apps` in `config.json`, which
+matters when the app is registered for the first time or when `apps.yaml` changed.
+
+After the deploy, check the browser: the timeline lists photos with thumbnails,
+the viewer opens one with its EXIF caption, and "Open with" from the Files context
+menu reaches the viewer with the right photo. A 404 on
+`/graph/v1.0/users/<id>/photo/$value` is the user avatar, not the extension.
+
+Read the version from `manifest.json`, not from the size of the directory: the
+bundle is split into more chunks with every SDK major (41 files and 336 KB with
+SDK 7.4, 62 files and 572 KB with SDK 8.2).
+
+To roll back, remove the directory, restore the backup and fix the owner and
+service as in the steps above.
 
 ## URL routing
 
