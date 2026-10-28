@@ -26,14 +26,23 @@ independiente que habla con OpenCloud por WebDAV/Graph/OIDC, la misma forma que 
 
 ## Estado
 
-La Etapa 1 (extensión nativa) compila y pasa el type-check. Indexa el espacio personal por
-WebDAV con la sesión del host, así que no necesita app tokens, y se registra en el conmutador
-de aplicaciones. Las fechas salen del mtime del fichero; EXIF, GPS y favoritos/álbumes
-persistentes son de la Etapa 2.
+La extensión nativa es la que se usa a diario: versión 1.6.0, desplegada en
+`drive.domatix.cloud`. Cubre timeline por días, recuerdos, explorar, álbumes, lugares, archivo,
+duplicados, etiquetas, carpetas, mapa, favoritos y visor a pantalla completa con vídeo y descarga.
+Consume la API del servicio de fotos (`/ocphotos-api/...`), así que los metadatos viven en el
+servidor.
 
-El servicio de `app/server-go/` implementa el backend (índice incremental, EXIF por lecturas
-parciales, miniaturas propias, SQLite, API REST con su propio token Bearer). La PWA lo consume
-y también funciona sola con datos demo.
+El servicio que corre en producción está en el repo [ocapps](https://github.com/gnacho/ocapps),
+en su módulo `photos`: índice incremental por etag, EXIF por lecturas parciales, miniaturas
+propias con HEIC, vídeo HLS, hash perceptual, geocodificación inversa, SQLite en WAL y API REST
+con token Bearer. El `app/server-go/` de este repo es el esqueleto del mismo servicio y no es lo
+que escucha en el contenedor, de modo que puede ir por detrás.
+
+Las etiquetas y los favoritos se escriben como sidecars XMP junto a cada foto, y el escáner
+vuelve a leer los que deje otra herramienta, así que la biblioteca no depende del índice.
+
+La PWA de `app/` sigue disponible como alternativa standalone y embebida, y también funciona
+sola con datos demo.
 
 ## Desarrollo
 

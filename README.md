@@ -54,6 +54,9 @@ the metadata index (EXIF, GPS, tags, albums, hashes) and generates thumbnails, i
   via a **signed same-origin URL with HTTP Range** streaming.
 - **Favorites**, **auto-sync** (new photos show up on their own) and **HEIC/HEIF** support
   (pure-Go decoder in the service).
+- **Metadata that outlives the index**: tags and favorites are written as XMP sidecars
+  (`<photo>.xmp`) next to the file, and the scanner reads sidecars left by other tools
+  (Lightroom, darktable) back into the library, so a reindex or a moved file does not lose them.
 - **Native navigation**: the sections live in OpenCloud's left sidebar (`navItems`), and the
   UI is translated to Spanish (`l10n/translations.json`, follows the host language).
 - **Multi-user**: each OpenCloud account has its own photo library. The first time a user
@@ -76,6 +79,9 @@ ocphotos extension (Vue 3)  --  timeline, on this day, explore, albums, places, 
 The extension never stores credentials: it calls the service with the host session bearer,
 and the service validates it against OpenCloud's Graph `/me`. Each user gets their own
 isolated index (scoped by `oc_id`).
+
+Metadata is not trapped in that index: tags and favorites are mirrored to `.xmp` sidecars next
+to each file, and the scanner projects sidecars written by other editors back into the library.
 
 ## Install
 

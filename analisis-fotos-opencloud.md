@@ -218,7 +218,7 @@ Decisión de BBDD revisada: **SQLite** (modernc.org/sqlite, Go puro, binario est
 - PWA: modo servicio con scroll infinito (70k-ready), favoritos persistidos, auto-detección del servicio en mismo origen.
 - Empaquetado: `Dockerfile` multi-stage (frontend→Go→alpine, un solo contenedor), `docker-compose.yml`, `.env.example`. Volumen `/data` = memories.db + thumbs. Backup = copiar el .db.
 - Auth: app-token de OpenCloud solo en servidor; la PWA usa MEMORIES_TOKEN propio.
-- Pendiente al cerrar la v1.0: álbumes API (v0.2), ML fase 3, vídeo/HEIC, sidecars XMP. De esa lista, álbumes y vídeo/HEIC se entregaron después y ya no están pendientes (ver §13).
+- Pendiente al cerrar la v1.0: álbumes API (v0.2), ML fase 3, vídeo/HEIC, sidecars XMP. De esa lista, álbumes, vídeo/HEIC y los sidecars XMP se entregaron después y ya no están pendientes (ver §13).
 
 ### 11.1 v1.1 — theming claro/oscuro (estilo OpenCloud)
 Sistema de variables CSS semánticas (--ocm-*) con toggle Sol/Luna, default = prefers-color-scheme (light-first como la UI de OpenCloud), sin flash inicial (script inline), persistencia en localStorage, tiles del mapa CARTO light/dark sincronizados. El visor de fotos permanece oscuro en ambos temas (convención de visores). Integración nativa como extensión web OpenCloud (Vue 3 + extension-sdk) sigue en roadmap; la PWA standalone ya comparte lenguaje visual (superficies, bordes, tipografía del sistema).
@@ -232,19 +232,23 @@ La PWA detecta `window.self !== window.top` y oculta su chrome propio (topbar + 
 
 Siguiendo el plan de dos etapas, se ha construido **ocphotos**, extensión web nativa sobre el skeleton oficial (`@opencloud-eu/web-pkg` 7.4): timeline por días con scroll infinito, visor fullscreen (teclado, vídeo, descarga), Recuerdos ("Un día como hoy…"), miniaturas servidas por OpenCloud con la sesión del host (sin app-tokens), registro en el app-switcher. Compila (`pnpm build` → module federation `dist/`) y pasa `vue-tsc` limpio. Limitaciones de etapa: fecha por mtime (EXIF llega con el backend Go de la Etapa 2, ya construido en app/server-go), sin GPS/favoritos persistentes, escaneo WebDAV en navegador con caché localStorage.
 
-Esas limitaciones describen la etapa 1. La extensión de hoy toma los datos del photos-service y cubre lo que aquí falta. El estado real está en §13.
+Esas limitaciones describen la etapa 1. La extensión de hoy toma los datos del servicio de fotos y cubre lo que aquí falta. El estado real está en §13.
 
 ---
 
-## 13. Estado a 28 de octubre de 2026: v1.5.0 en producción
+## 13. Estado a 28 de octubre de 2026: v1.6.0 en producción
 
 Este apartado sustituye a las limitaciones descritas en §12 y corrige la lista de pendientes de §11.
 
-**Qué es el producto hoy.** `ocphotos` es una extensión web nativa (Vue 3 sobre `@opencloud-eu/web-pkg` 7.4) registrada en el app-switcher de OpenCloud. No escanea WebDAV desde el navegador: consume la API REST del photos-service en el mismo origen (`/api/...`), y por eso los metadatos, la geolocalización, los favoritos, las etiquetas, los álbumes y el archivo viven en el servidor y no en el navegador. La PWA React de `/app` se mantiene como alternativa standalone y como app embebida por iframe, con autodetección del servicio y modo demo generado.
+**Qué es el producto hoy.** `ocphotos` es una extensión web nativa (Vue 3 sobre `@opencloud-eu/web-pkg` 8.2) registrada en el app-switcher de OpenCloud. No escanea WebDAV desde el navegador: consume la API REST del servicio de fotos en el mismo origen (`/ocphotos-api/...`), y por eso los metadatos, la geolocalización, los favoritos, las etiquetas, los álbumes y el archivo viven en el servidor y no en el navegador. La PWA React de `/app` se mantiene como alternativa standalone y como app embebida por iframe, con autodetección del servicio y modo demo generado.
+
+**Quién sirve esa API.** El proceso que corre en producción es `ocapps` (`opencloud-apps.service`), que aloja varios módulos de la plataforma y sirve las fotos desde el suyo (`photos`). `app/server-go` en este repo es el esqueleto del mismo servicio y fue el que se desplegó en la etapa 1 como `photos-service`: hoy no es lo que escucha en el contenedor. Los dos árboles han divergido, porque la lectura de sidecars solo se implementó en `ocapps`. La consecuencia práctica es que cada arreglo del servicio hay que hacerlo dos veces, y que la copia de este repo solo tiene el escritor de XMP.
 
 **Funciones vivas** (una ruta por pantalla): timeline por días con scroll infinito y barra de años, recuerdos y "un día como hoy", explorar con búsqueda, álbumes con API completa (crear, renombrar, borrar, listar, añadir y quitar fotos), lugares, archivo, duplicados por hash perceptual, etiquetas, carpetas, mapa, favoritos y visor a pantalla completa con teclado, vídeo HLS, descarga del original y "abrir con" desde el menú de Archivos.
 
-**Qué aporta el servicio** (`app/server-go`, 24 ficheros Go, SQLite en WAL): cliente DAV con escaneo incremental por etag, EXIF por lecturas parciales, miniaturas propias con soporte HEIC, vídeo HLS, hash perceptual para duplicados, geolocalización, etiquetas, álbumes, calendario, recuerdos y API REST con token propio. Los siete endpoints de álbumes y los de vídeo están implementados y en uso, de modo que las dos entradas que §11 daba por pendientes ya están cerradas.
+**Qué aporta el servicio** (`ocapps`, módulo `photos`, SQLite en WAL): cliente DAV con escaneo incremental por etag, EXIF por lecturas parciales, miniaturas propias con soporte HEIC, vídeo HLS, hash perceptual para duplicados, geolocalización, etiquetas, álbumes, calendario, recuerdos y API REST con token propio. Los siete endpoints de álbumes y los de vídeo están implementados y en uso, de modo que las dos entradas que §11 daba por pendientes ya están cerradas.
+
+**Sidecars XMP, en los dos sentidos.** Al marcar un favorito o cambiar una etiqueta, el servicio escribe `<foto>.xmp` junto al original, con `dc:subject` y `xmp:Rating`. En el escaneo ocurre lo contrario: los `.xmp` ya llegan en el PROPFIND de cada carpeta, así que saber cuáles hay no cuesta ninguna petición, y el fichero solo se descarga cuando su etag cambia respecto al aplicado. Las reglas son conservadoras a propósito: el favorito solo se toca si el paquete trae `xmp:Rating` (5 o más marca, menos desmarca) y las etiquetas solo se reemplazan si trae al menos una, de forma que un sidecar ajeno sin esos campos no borra nada local. Con eso, editar con Lightroom o darktable y reindexar funciona, y los metadatos sobreviven a mover la foto fuera del índice.
 
 **Calidad e infraestructura**, que antes no existía:
 
@@ -254,10 +258,10 @@ Este apartado sustituye a las limitaciones descritas en §12 y corrige la lista 
 - Dependabot agrupado por ecosistema para menores y parches, con los cambios mayores sueltos, y un guardarraíl que falla si el lockfile deja de fijar los `overrides` de seguridad.
 - Release por tag que genera el zip instalable, más la versión del manifiesto alineada con el tag.
 
-**Producción.** La 1.5.0 está desplegada en `drive.domatix.cloud` (contenedor 4125). Verificado en navegador real: el manifiesto servido declara 1.5.0, el timeline carga las fotos con sus miniaturas y el flujo "abrir con" desde Archivos abre el visor con la foto correcta y su pie EXIF.
+**Producción.** La 1.6.0 está desplegada en `drive.domatix.cloud` (contenedor 4125). Verificado en navegador real: el manifiesto servido declara 1.6.0, el timeline carga las fotos con sus miniaturas, el flujo "abrir con" desde Archivos abre el visor con la foto correcta y su pie EXIF, y un sidecar escrito a mano se refleja en el índice tras pedir un reescaneo.
 
 **Pendiente real**, revisado contra el código y no contra notas antiguas:
 
 - Reconocimiento facial. El servicio no tiene tablas de caras ni endpoints de personas, y el panel "Personas" de la PWA funciona con datos demo. Es el único frente grande que queda y necesita un microservicio de ML aparte (Immich usa FastAPI con modelos ONNX, InsightFace para caras y CLIP para búsqueda semántica).
-- Sidecars XMP. No hay soporte, así que los metadatos editados no sobreviven si un fichero se mueve fuera del índice.
+- Una sola copia del servicio. `app/server-go` y el módulo `internal/photos` de `ocapps` han divergido, y no en detalles: la lectura de sidecars existe solo en `ocapps`. Mientras siga así, el código de este repo no describe lo que corre y cualquier arreglo del servicio hay que hacerlo dos veces.
 - Deuda menor: la cobertura de algunas vistas está entre el 42 % y el 60 %, `index.ts` se queda en el 40,9 % porque los imports dinámicos de cada ruta no se ejecutan en tests unitarios, y la alerta de `deepmerge` sigue abierta sin parche publicado por el upstream.

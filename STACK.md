@@ -64,28 +64,37 @@ session bearer and the service validates it against OpenCloud's Graph `/me`.
 - Backend: **Go 1.26.4**, same storage/EXIF/thumbnail approach as ocapps but
   single-tenant, plus a PWA served by the same binary (SPA fallback).
 
-## Dependency update status (checked 2026-10-05)
+## Dependency update status (checked 2026-10-28)
 
-Dependabot is enabled security-only; version bumps land as PRs.
+Dependabot is enabled with groups per ecosystem (`.github/dependabot.yml`): minor and
+patch bumps arrive as a single PR, majors arrive one at a time. Security alerts come
+from the GitHub setting, not from the config.
 
 ### Extension (`ocphotos/`)
 
-Up to date except for routine bumps:
+- On the OpenCloud 8 line: all six `@opencloud-eu/*` packages at `^8.2.1`
+  (`web-pkg`, `web-client`, `extension-sdk`, `eslint-config`, `prettier-config`,
+  `tsconfig`). Moving from 7.4 to 8.2 needed no source changes, only the version bump.
+- Tooling: vue 3.5.44, vite 8.3.5, eslint 10.13.0, prettier 3.9.10, vue-tsc 3.3.13,
+  `@vue/test-utils` 2.5.1, vitest 4.1.12 (the 4.1.12 floor is required by the
+  `@vitest/mocker` security alerts).
+- Blocked: TypeScript stays below 7 (`^6.0.0` in the extension, `~5.9.3` in the PWA)
+  because `typescript-eslint` declares a peer range that ends before 6.1, so a 7.x
+  bump fails the install. Dependabot reopens it when the linter widens the range.
+- Known and not actionable: `deepmerge` 4.3.1 is the last published version and the
+  advisory covers it. It arrives through `@opencloud-eu/web-pkg`.
 
-- Patch/minor available: vue 3.5.43, vite 8.3.2, eslint 10.12, prettier 3.9.9,
-  vue-tsc 3.3.12, `@vue/test-utils` 2.5.1, vitest 4.1.x line.
-- Majors to evaluate deliberately:
-  - `@opencloud-eu/*` 7.4 -> 8.0: follows the OpenCloud 8 host line
-    (extension-sdk already has an 8.1.0-alpha). Move when the host moves.
-  - TypeScript 6 -> 7, Vitest 4 -> 5: toolchain majors, no rush.
+Guard rail: `pnpm check:overrides` fails the CI job when `pnpm-lock.yaml` stops pinning
+the `pnpm.overrides` of `package.json`, which is what Dependabot does when it
+regenerates that lockfile.
 
 ### Companion backend (ocapps)
 
-Mostly current. Available: goquery 1.13.0, cascadia 1.3.5, gofeed 1.5.0,
-h265 0.2.3, x/crypto 0.57.0, x/sync 0.23.0, modernc.org/sqlite 1.60.1,
-testify 1.12.1.
-Watch item: `go-shiori/go-readability` is deprecated upstream (used by the
-ocnews side of ocapps); plan a replacement when it bites.
+The service that runs in production is the `photos` module of
+[ocapps](https://github.com/gnacho/ocapps), on Go 1.26.10 with `golang.org/x/net`
+0.62.0 (that floor closes GO-2026-6617 and GO-2026-6866). `app/server-go` in this repo
+holds the same service as an older copy and only received the XMP writer, so treat
+ocapps as the source of truth for the backend.
 
 ### Standalone variant (`app/`)
 
