@@ -252,7 +252,7 @@ Este apartado sustituye a las limitaciones descritas en §12 y corrige la lista 
 
 **Calidad e infraestructura**, que antes no existía:
 
-- 182 tests unitarios en la extensión (vitest con happy-dom, 13 ficheros) con 88,3 % de sentencias, y umbrales de cobertura que rompen el build si bajan. El cliente de la API está al 98,75 % y el visor, los álbumes, los lugares, las carpetas y el mapa pasan del 92 %.
+- 241 tests unitarios en la extensión (vitest con happy-dom, 19 ficheros) con 94,65 % de sentencias, y umbrales de cobertura que rompen el build si bajan. El cliente de la API está al 98,75 % y todas las vistas pasan del 92 %.
 - 30 tests en la PWA (vitest con jsdom y Testing Library) con 97,68 % de sentencias sobre los ficheros con lógica.
 - Integración continua en cada pull request con dos trabajos (extensión y PWA), que ejecutan tipos, lint, tests, cobertura y build.
 - Dependabot agrupado por ecosistema para menores y parches, con los cambios mayores sueltos, y un guardarraíl que falla si el lockfile deja de fijar los `overrides` de seguridad.
