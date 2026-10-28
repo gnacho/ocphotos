@@ -44,7 +44,16 @@ cd ocphotos
 pnpm install
 pnpm build        # pnpm build:w para watch
 pnpm check:types
+pnpm lint
+pnpm test:unit
+pnpm test:coverage
 ```
+
+La suite corre sobre Vitest con happy-dom. `pnpm test:coverage` añade el informe
+de cobertura de V8 y falla cuando los totales bajan de los umbrales declarados en
+`ocphotos/vitest.config.ts`: 75 % de sentencias, 58 % de ramas, 56 % de funciones
+y 78 % de líneas en el global, con suelos más altos para `src/composables/**` y
+`src/components/**`.
 
 PWA y servicio independientes:
 
@@ -52,7 +61,27 @@ PWA y servicio independientes:
 cd app
 npm install
 npm run dev
+npm run lint
+npm run test:coverage
 ```
+
+La suite de la app corre sobre jsdom y mide solo los ficheros con lógica
+(`src/lib/opencloud.ts`, `src/lib/store.tsx`, `src/lib/groupByDay.ts` y
+`src/hooks/useStore.ts`). Sus umbrales están en `app/vitest.config.ts`. Los
+componentes de shadcn en `src/components/ui/` son vendorizados y quedan fuera.
+
+### Integración continua
+
+`.github/workflows/ci.yml` se ejecuta en cada pull request y en cada push a
+`main`, siempre con Node 24. Tiene dos trabajos:
+
+- `Extension (types, lint, tests, coverage, build)` instala con el lockfile
+  congelado y luego ejecuta tipos, lint, tests con cobertura y el build.
+- `Standalone app (lint, tests, coverage, build)` ejecuta `npm ci` y luego lint,
+  tests con cobertura y el build.
+
+Un check en rojo significa que uno de esos pasos ha fallado. La cobertura forma
+parte del build, así que añadir código sin tests puede poner el CI en rojo.
 
 ## Licencia
 
