@@ -30,6 +30,7 @@ import (
 	"github.com/opencloud-memories/photos-service/internal/store"
 	"github.com/opencloud-memories/photos-service/internal/thumb"
 	"github.com/opencloud-memories/photos-service/internal/video"
+	"github.com/opencloud-memories/photos-service/internal/xmp"
 )
 
 type Server struct {
@@ -258,6 +259,7 @@ func (s *Server) favorite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+	s.writeXMP(r.Context(), id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -616,6 +618,7 @@ func (s *Server) addTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+	s.writeXMP(r.Context(), id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -625,7 +628,30 @@ func (s *Server) removeTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+	s.writeXMP(r.Context(), id)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// writeXMP proyecta etiquetas y favorito al sidecar .xmp de la foto. El índice
+// es la fuente de verdad: si el sidecar no se puede escribir se registra y la
+// petición sigue adelante, para que un WebDAV caído no bloquee la interfaz.
+func (s *Server) writeXMP(ctx context.Context, id int64) {
+	a, err := s.st.AssetByID(ctx, id)
+	if err != nil {
+		s.log.Warn("xmp: asset no encontrado", "id", id, "err", err)
+		return
+	}
+	tags, err := s.st.AssetTags(ctx, id)
+	if err != nil {
+		s.log.Warn("xmp: no se pudieron leer las etiquetas", "id", id, "err", err)
+		return
+	}
+	href := xmp.SidecarPath(a.Path)
+	cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	if err := s.dav.Put(cctx, href, "application/rdf+xml", xmp.Build(xmp.Meta{Tags: tags, Favorite: a.IsFavorite})); err != nil {
+		s.log.Warn("xmp: no se pudo escribir el sidecar", "path", href, "err", err)
+	}
 }
 
 // --- Carpetas ---

@@ -291,3 +291,45 @@ func (c *Client) Download(ctx context.Context, href string) (io.ReadCloser, stri
 	ct := resp.Header.Get("Content-Type")
 	return resp.Body, ct, nil
 }
+
+// Put escribe un fichero pequeño (sidecar XMP) contra WebDAV. Crea o reemplaza.
+func (c *Client) Put(ctx context.Context, href, contentType string, body []byte) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.FileURL(href), bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(c.user, c.token)
+	req.Header.Set("Content-Type", contentType)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("put %s: %s", href, resp.Status)
+	}
+	return nil
+}
+
+// GetSmall descarga un fichero pequeño. Devuelve found=false si no existe
+// (404), que es lo normal cuando la foto aún no tiene sidecar.
+func (c *Client) GetSmall(ctx context.Context, href string) ([]byte, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.FileURL(href), nil)
+	if err != nil {
+		return nil, false, err
+	}
+	req.SetBasicAuth(c.user, c.token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, false, nil
+	}
+	if resp.StatusCode >= 300 {
+		return nil, false, fmt.Errorf("get %s: %s", href, resp.Status)
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	return b, true, err
+}
