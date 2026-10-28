@@ -81,8 +81,12 @@ componentes de shadcn en `src/components/ui/` son vendorizados y quedan fuera.
 ### Integración continua
 
 `.github/workflows/ci.yml` se ejecuta en cada pull request y en cada push a
-`main`, siempre con Node 24. Tiene dos trabajos:
+`main`, siempre con Node 24. Tiene tres trabajos:
 
+- `Repo (no backend, no Docker)` falla si aparece aquí un fichero Go, un `go.mod`, un
+  Dockerfile, un compose o un `.dockerignore`. El servicio vive en
+  [ocapps](https://github.com/gnacho/ocapps) y este control impide que vuelva a crecer
+  una segunda copia.
 - `Extension (overrides, types, lint, tests, coverage, build)` instala con el lockfile
   congelado y luego ejecuta tipos, lint, tests con cobertura y el build.
 - `Standalone app (lint, tests, coverage, build)` ejecuta `npm ci` y luego lint,

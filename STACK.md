@@ -119,6 +119,7 @@ build, so a change that adds untested code can turn the CI red.
 
 | Job | What it runs |
 |---|---|
+| `Repo (no backend, no Docker)` | fails if the tree contains Go files, `go.mod`, a Dockerfile, a compose file or a `.dockerignore` |
 | `Extension (overrides, types, lint, tests, coverage, build)` | `pnpm install --frozen-lockfile`, `check:overrides`, `check:types`, `lint`, `test:coverage`, `build` |
 | `Standalone app (lint, tests, coverage, build)` | `npm ci`, `lint`, `test:coverage`, `build` |
 

@@ -164,8 +164,12 @@ shadcn components under `src/components/ui/` are vendored and excluded.
 ### Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
-always with Node 24. It has two jobs:
+always with Node 24. It has three jobs:
 
+- `Repo (no backend, no Docker)` fails if a Go file, a `go.mod`, a Dockerfile, a
+  compose file or a `.dockerignore` appears here. The service lives in
+  [ocapps](https://github.com/gnacho/ocapps), and this check keeps a second copy
+  from growing back.
 - `Extension (overrides, types, lint, tests, coverage, build)` installs with a frozen
   lockfile, then runs types, lint, tests with coverage and the build.
 - `Standalone app (lint, tests, coverage, build)` runs `npm ci`, then lint, tests

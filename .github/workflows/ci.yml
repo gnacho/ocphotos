@@ -14,6 +14,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  repo:
+    name: Repo (no backend, no Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Reject backend and Docker files
+        run: |
+          found=$(git ls-files | grep -iE '(\.go$|(^|/)go\.(mod|sum)$|(^|/)Dockerfile$|(^|/)docker-compose[^/]*\.ya?ml$|(^|/)\.dockerignore$)' || true)
+          if [ -n "$found" ]; then
+            echo "This repo does not hold the photo service or Docker files."
+            echo "The service lives in https://github.com/gnacho/ocapps, module photos."
+            echo "Found:"
+            echo "$found"
+            exit 1
+          fi
+          echo "No Go code and no Docker files. The service stays in ocapps."
   extension:
     name: Extension (overrides, types, lint, tests, coverage, build)
     runs-on: ubuntu-latest
