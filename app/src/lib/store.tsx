@@ -8,7 +8,7 @@ import { StoreCtx } from '@/hooks/useStore'
 
 /**
  * Tres modos de datos:
- *  - service: el photos-service (Go) sirve API + PWA en el mismo origen → PRODUCCIÓN
+ *  - service: el servicio de fotos (Go) sirve API + PWA en el mismo origen → PRODUCCIÓN
  *  - opencloud: indexado directo desde el navegador (demo contra instancia real, máx 500)
  *  - demo: datos sintéticos
  */
@@ -162,7 +162,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setMode('service')
       cursorRef.current = null
       await loadPage(token, true)
-      setConnection({ mode: 'opencloud', baseUrl: window.location.origin, username: '', appToken: '', status: 'ok', message: `photos-service: ${st.assets} fotos indexadas` })
+      setConnection({ mode: 'opencloud', baseUrl: window.location.origin, username: '', appToken: '', status: 'ok', message: `servicio de fotos: ${st.assets} fotos indexadas` })
     } catch (e: unknown) {
       setConnection((c) => ({ ...c, status: 'error', message: e instanceof Error ? e.message : 'No se pudo conectar con el servicio' }))
     }

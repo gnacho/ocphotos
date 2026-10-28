@@ -21,7 +21,6 @@ independiente que habla con OpenCloud por WebDAV/Graph/OIDC, la misma forma que 
 | `analisis-fotos-opencloud.docx` | El mismo análisis exportado a documento |
 | `ocphotos/` | Extensión web nativa de OpenCloud (Vue 3 + extension-sdk): timeline, visor, recuerdos |
 | `app/` | Prototipo PWA independiente: React 19 + TypeScript + Vite + Tailwind + shadcn/ui |
-| `app/server-go/` | Servicio de fotos Go: cliente WebDAV/Graph, índice incremental, EXIF, miniaturas, SQLite, API REST |
 | `deploy/` | Notas de despliegue en una instancia OpenCloud |
 
 ## Estado
@@ -35,8 +34,8 @@ servidor.
 El servicio que corre en producción está en el repo [ocapps](https://github.com/gnacho/ocapps),
 en su módulo `photos`: índice incremental por etag, EXIF por lecturas parciales, miniaturas
 propias con HEIC, vídeo HLS, hash perceptual, geocodificación inversa, SQLite en WAL y API REST
-con token Bearer. El `app/server-go/` de este repo es el esqueleto del mismo servicio y no es lo
-que escucha en el contenedor, de modo que puede ir por detrás.
+con token Bearer. Ese servicio no vive en este repo (aquí hubo una copia que se retiró al
+quedarse atrás), así que cualquier cambio del backend se hace allí.
 
 Las etiquetas y los favoritos se escriben como sidecars XMP junto a cada foto, y el escáner
 vuelve a leer los que deje otra herramienta, así que la biblioteca no depende del índice.

@@ -62,7 +62,7 @@ export interface ConnectionState {
   message?: string
 }
 
-/** forma de un asset tal como viene del API del photos-service */
+/** forma de un asset tal como viene del API del servicio de fotos */
 export interface ApiAsset {
   id: number | string
   path: string
