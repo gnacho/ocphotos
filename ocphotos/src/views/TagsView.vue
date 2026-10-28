@@ -13,6 +13,7 @@
     </div>
 
     <div v-if="loading" class="tags-note" v-text="$gettext('Loading…')" />
+    <div v-else-if="error" class="tags-note tags-error" v-text="error" />
 
     <div v-else-if="selected" class="tags-scroll">
       <div class="tags-grid">
@@ -47,7 +48,7 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref } from 'vue'
 import { useGettext } from 'vue3-gettext'
-import { usePhotoLibrary, Tag, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, errorMessage, Tag, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
@@ -59,6 +60,7 @@ export default defineComponent({
 
     const tags = ref<Tag[]>([])
     const loading = ref(true)
+    const error = ref<string | null>(null)
     const selected = ref<string | null>(null)
     const selectedAssets = ref<Photo[]>([])
     const viewerList = ref<Photo[] | null>(null)
@@ -70,8 +72,11 @@ export default defineComponent({
 
     const load = async () => {
       loading.value = true
+      error.value = null
       try {
         tags.value = await fetchTags()
+      } catch (e) {
+        error.value = errorMessage(e)
       } finally {
         loading.value = false
       }
@@ -79,7 +84,13 @@ export default defineComponent({
 
     const openTag = async (t: Tag) => {
       selected.value = t.name
-      selectedAssets.value = await tagAssets(t.name)
+      error.value = null
+      try {
+        selectedAssets.value = await tagAssets(t.name)
+      } catch (e) {
+        error.value = errorMessage(e)
+        selectedAssets.value = []
+      }
       for (const p of selectedAssets.value) void ensurePreview(p, 400)
     }
 
@@ -102,7 +113,7 @@ export default defineComponent({
     onMounted(load)
 
     return {
-      tags, tagsLabel, itemsLabel, loading, selected, selectedAssets, viewerList, viewerIndex,
+      tags, tagsLabel, itemsLabel, loading, error, selected, selectedAssets, viewerList, viewerIndex,
       thumbSrc, openTag, close, openPhoto, onImgError, ensurePreview, ensureOriginal
     }
   }
@@ -119,6 +130,7 @@ export default defineComponent({
 .tags-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
 .tags-icon-btn { border: 0; background: none; cursor: pointer; font-size: 1.4rem; line-height: 1; color: var(--oc-role-on-surface, #191c1d); }
 .tags-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
+.tags-error { color: var(--oc-role-error, #ba1a1a); }
 .tags-scroll { flex: 1; overflow-y: auto; padding: 16px; }
 .tags-chips { display: flex; flex-wrap: wrap; gap: 10px; }
 .tags-chip {

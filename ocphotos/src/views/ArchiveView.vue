@@ -6,6 +6,7 @@
     </div>
 
     <div v-if="loading" class="arch-note" v-text="$gettext('Loading…')" />
+    <div v-else-if="error" class="arch-note arch-error" v-text="error" />
     <div v-else-if="photos.length === 0" class="arch-note" v-text="$gettext('Nothing archived')" />
 
     <div v-else class="arch-scroll">
@@ -34,7 +35,7 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useGettext } from 'vue3-gettext'
-import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, errorMessage, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
@@ -44,6 +45,7 @@ export default defineComponent({
     const { $gettext } = useGettext()
     const { fetchArchived, setArchived, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
     const loading = ref(true)
+    const error = ref<string | null>(null)
     const photos = ref<Photo[]>([])
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
@@ -53,15 +55,24 @@ export default defineComponent({
 
     const load = async () => {
       loading.value = true
+      error.value = null
       try {
         photos.value = await fetchArchived()
+      } catch (e) {
+        error.value = errorMessage(e)
       } finally {
         loading.value = false
       }
     }
 
     const unarchive = async (p: Photo) => {
-      await setArchived(p.id, false)
+      error.value = null
+      try {
+        await setArchived(p.id, false)
+      } catch (e) {
+        error.value = errorMessage(e)
+        return
+      }
       photos.value = photos.value.filter((x) => x.id !== p.id)
     }
 
@@ -82,7 +93,7 @@ export default defineComponent({
 
     onMounted(load)
 
-    return { loading, photos, itemsLabel, viewerList, viewerIndex, thumbSrc, unarchive, openViewer, onImgError, ensurePreview, ensureOriginal }
+    return { loading, error, photos, itemsLabel, viewerList, viewerIndex, thumbSrc, unarchive, openViewer, onImgError, ensurePreview, ensureOriginal }
   }
 })
 </script>
@@ -93,6 +104,7 @@ export default defineComponent({
 .arch-toolbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .arch-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
 .arch-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
+.arch-error { color: var(--oc-role-error, #ba1a1a); }
 .arch-scroll { flex: 1; overflow-y: auto; padding: 12px 16px; }
 .arch-grid { display: grid; gap: 3px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 .arch-cell { position: relative; aspect-ratio: 1; }

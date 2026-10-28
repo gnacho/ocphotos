@@ -13,6 +13,7 @@
     </div>
 
     <div v-if="loading" class="places-note" v-text="$gettext('Loading…')" />
+    <div v-else-if="error" class="places-note places-error" v-text="error" />
 
     <div v-else-if="selected" class="places-scroll">
       <div class="places-grid">
@@ -48,7 +49,7 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref } from 'vue'
 import { useGettext } from 'vue3-gettext'
-import { usePhotoLibrary, Place, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, errorMessage, Place, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
@@ -63,6 +64,7 @@ export default defineComponent({
 
     const places = ref<Place[]>([])
     const loading = ref(true)
+    const error = ref<string | null>(null)
     const selected = ref<Place | null>(null)
     const selectedAssets = ref<Photo[]>([])
     const viewerList = ref<Photo[] | null>(null)
@@ -74,9 +76,12 @@ export default defineComponent({
 
     const load = async () => {
       loading.value = true
+      error.value = null
       try {
         places.value = await fetchPlaces()
         for (const pl of places.value) if (pl.coverId) void ensurePreview({ id: pl.coverId } as Photo, 400)
+      } catch (e) {
+        error.value = errorMessage(e)
       } finally {
         loading.value = false
       }
@@ -84,7 +89,13 @@ export default defineComponent({
 
     const openPlace = async (pl: Place) => {
       selected.value = pl
-      selectedAssets.value = await placeAssets(pl.lat, pl.lon)
+      error.value = null
+      try {
+        selectedAssets.value = await placeAssets(pl.lat, pl.lon)
+      } catch (e) {
+        error.value = errorMessage(e)
+        selectedAssets.value = []
+      }
       for (const p of selectedAssets.value) void ensurePreview(p, 400)
     }
 
@@ -107,7 +118,7 @@ export default defineComponent({
     onMounted(load)
 
     return {
-      places, placesLabel, itemsLabel, loading, selected, selectedAssets, viewerList, viewerIndex,
+      places, placesLabel, itemsLabel, loading, error, selected, selectedAssets, viewerList, viewerIndex,
       thumbSrc, coverSrc, coords, openPlace, closePlace, openPhoto, onImgError,
       ensurePreview, ensureOriginal
     }
@@ -125,6 +136,7 @@ export default defineComponent({
 .places-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
 .places-icon-btn { border: 0; background: none; cursor: pointer; font-size: 1.4rem; line-height: 1; color: var(--oc-role-on-surface, #191c1d); }
 .places-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
+.places-error { color: var(--oc-role-error, #ba1a1a); }
 .places-scroll { flex: 1; overflow-y: auto; padding: 12px 16px; }
 .places-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .places-card {

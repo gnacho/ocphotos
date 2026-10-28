@@ -6,6 +6,7 @@
     </div>
 
     <div v-if="loading" class="fav-note" v-text="$gettext('Loading…')" />
+    <div v-else-if="error" class="fav-note fav-error" v-text="error" />
     <div v-else-if="photos.length === 0" class="fav-note" v-text="$gettext('No favorites yet')" />
 
     <div v-else class="fav-scroll">
@@ -32,7 +33,7 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useGettext } from 'vue3-gettext'
-import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, errorMessage, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
@@ -43,6 +44,7 @@ export default defineComponent({
     const { fetchFavorites, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
     const itemsLabel = computed(() => `${photos.value.length} ${$gettext(photos.value.length === 1 ? 'item' : 'items')}`)
     const loading = ref(true)
+    const error = ref<string | null>(null)
     const photos = ref<Photo[]>([])
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
@@ -71,12 +73,14 @@ export default defineComponent({
     onMounted(async () => {
       try {
         photos.value = await fetchFavorites()
+      } catch (e) {
+        error.value = errorMessage(e)
       } finally {
         loading.value = false
       }
     })
 
-    return { loading, photos, itemsLabel, viewerList, viewerIndex, openViewer, thumbSrc, onImgError, ensurePreview, ensureOriginal }
+    return { loading, error, photos, itemsLabel, viewerList, viewerIndex, openViewer, thumbSrc, onImgError, ensurePreview, ensureOriginal }
   }
 })
 </script>
@@ -90,6 +94,7 @@ export default defineComponent({
 .fav-toolbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .fav-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
 .fav-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
+.fav-error { color: var(--oc-role-error, #ba1a1a); }
 .fav-scroll { flex: 1; overflow-y: auto; padding: 0 8px; }
 .fav-grid { display: grid; gap: 3px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 .fav-cell {

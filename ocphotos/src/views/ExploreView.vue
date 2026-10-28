@@ -31,6 +31,7 @@
       </div>
 
       <div v-if="loading" class="explore-note" v-text="$gettext('Searching…')" />
+      <div v-else-if="error" class="explore-note explore-error" v-text="error" />
       <div v-else-if="searched && results.length === 0" class="explore-note" v-text="$gettext('No results')" />
       <div v-else-if="results.length" class="explore-grid">
         <button v-for="p in results" :key="p.id" class="explore-cell" @click="open(p)">
@@ -54,7 +55,7 @@
 
 <script lang="ts">
 import { defineComponent, ref } from 'vue'
-import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, errorMessage, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
@@ -65,6 +66,7 @@ export default defineComponent({
     const query = ref('')
     const results = ref<Photo[]>([])
     const loading = ref(false)
+    const error = ref<string | null>(null)
     const searched = ref(false)
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
@@ -76,9 +78,13 @@ export default defineComponent({
       if (!q) return
       loading.value = true
       searched.value = true
+      error.value = null
       try {
         results.value = await searchAssets(q)
         for (const p of results.value) void ensurePreview(p, 400)
+      } catch (e) {
+        error.value = errorMessage(e)
+        results.value = []
       } finally {
         loading.value = false
       }
@@ -95,7 +101,7 @@ export default defineComponent({
       el.onerror = null
     }
 
-    return { query, results, loading, searched, runSearch, open, thumbSrc, onImgError, viewerList, viewerIndex, ensurePreview, ensureOriginal }
+    return { query, results, loading, error, searched, runSearch, open, thumbSrc, onImgError, viewerList, viewerIndex, ensurePreview, ensureOriginal }
   }
 })
 </script>
@@ -125,6 +131,7 @@ export default defineComponent({
   border: 1px solid var(--oc-role-outline-variant, #bfc8cc); border-radius: 10px; text-decoration: none;
 }
 .explore-note { color: var(--oc-role-on-surface-variant, #40484c); padding: 16px 0; }
+.explore-error { color: var(--oc-role-error, #ba1a1a); }
 .explore-grid { display: grid; gap: 3px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
 .explore-cell {
   position: relative; aspect-ratio: 1; padding: 0; border: 0; cursor: pointer;

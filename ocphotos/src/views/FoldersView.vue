@@ -13,6 +13,8 @@
 
     <div v-if="loading" class="folders-note" v-text="$gettext('Loading…')" />
 
+    <div v-else-if="error" class="folders-note folders-error" v-text="error" />
+
     <div v-else class="folders-scroll">
       <div v-if="folders.length" class="folders-sub">
         <h2 class="folders-subtitle" v-text="$gettext('Subfolders')" />
@@ -49,7 +51,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref } from 'vue'
-import { usePhotoLibrary, FolderEntry, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, errorMessage, FolderEntry, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
@@ -59,6 +61,7 @@ export default defineComponent({
     const { fetchFolder, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
 
     const loading = ref(true)
+    const error = ref<string | null>(null)
     const cwd = ref('')
     const folders = ref<FolderEntry[]>([])
     const assets = ref<Photo[]>([])
@@ -71,11 +74,14 @@ export default defineComponent({
     const load = async (path: string) => {
       loading.value = true
       cwd.value = path
+      error.value = null
       try {
         const listing = await fetchFolder(path)
         folders.value = listing.folders
         assets.value = listing.assets
         for (const p of assets.value) void ensurePreview(p, 400)
+      } catch (e) {
+        error.value = errorMessage(e)
       } finally {
         loading.value = false
       }
@@ -101,7 +107,7 @@ export default defineComponent({
     })
 
     return {
-      loading, folders, assets, segments, viewerList, viewerIndex,
+      loading, error, folders, assets, segments, viewerList, viewerIndex,
       thumbSrc, go, openPhoto, onImgError, ensurePreview, ensureOriginal
     }
   }
@@ -119,6 +125,7 @@ export default defineComponent({
 .folders-crumb { border: 0; background: none; cursor: pointer; color: var(--oc-role-primary, #00677f); padding: 0 2px; }
 .folders-sep { color: var(--oc-role-on-surface-variant, #40484c); }
 .folders-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
+.folders-error { color: var(--oc-role-error, #ba1a1a); }
 .folders-scroll { flex: 1; overflow-y: auto; padding: 12px 16px; }
 .folders-subtitle { margin: 0 0 8px; font-size: 0.9rem; font-weight: 600; }
 .folders-cards { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
