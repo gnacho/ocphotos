@@ -1,0 +1,50 @@
+name: Docker image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/Dockerfile'
+      - 'app/package.json'
+      - 'app/package-lock.json'
+      - 'app/index.html'
+      - 'app/vite.config.ts'
+      - 'app/tsconfig*.json'
+      - 'app/components.json'
+      - 'app/src/**'
+      - 'app/public/**'
+      - 'app/server-go/**'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    paths:
+      - 'app/Dockerfile'
+      - 'app/package.json'
+      - 'app/package-lock.json'
+      - 'app/index.html'
+      - 'app/vite.config.ts'
+      - 'app/tsconfig*.json'
+      - 'app/components.json'
+      - 'app/src/**'
+      - 'app/public/**'
+      - 'app/server-go/**'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -t ocphotos:ci app/
+      - name: Check the image contents
+        run: |
+          docker run --rm --entrypoint sh ocphotos:ci -c 'test -x /usr/local/bin/photos-service && test -f /app/web/index.html'
