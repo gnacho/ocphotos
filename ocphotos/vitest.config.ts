@@ -12,14 +12,14 @@ export default defineConfig({
       reporter: ['text', 'json-summary'],
       include: ['src/**/*.ts', 'src/**/*.vue'],
       exclude: ['src/**/*.spec.ts', 'src/**/*.d.ts'],
-      // Suelo global: por debajo de la cobertura actual (94,6 / 89 / 86,2 / 95,5) para no
+      // Suelo global: por debajo de la cobertura actual (95,7 / 89 / 89,7 / 96,7) para no
       // bloquear cambios pequeños, pero suficiente para notar que algo deja de
       // ejecutarse. Los módulos con más valor tienen su propio umbral.
       thresholds: {
-        statements: 93,
-        branches: 85,
-        functions: 82,
-        lines: 93,
+        statements: 95,
+        branches: 88,
+        functions: 88,
+        lines: 96,
         'src/composables/**': {
           statements: 95,
           functions: 90,

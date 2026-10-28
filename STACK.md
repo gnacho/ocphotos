@@ -31,7 +31,7 @@ session bearer and the service validates it against OpenCloud's Graph `/me`.
   **Prettier 3**.
 - `pnpm check:types`, `pnpm lint`, `pnpm build`, `pnpm test:unit` (Vitest) and
   `pnpm test:coverage`. The suite runs on happy-dom and the coverage thresholds
-  (93 / 85 / 82 / 93 overall, stricter for `src/composables/**` and
+  (95 / 88 / 88 / 96 overall, stricter for `src/composables/**` and
   `src/components/**`) live in `vitest.config.ts`.
 
 ## Companion backend (gnacho/ocapps, not in this repo)
