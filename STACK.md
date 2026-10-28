@@ -113,7 +113,7 @@ build, so a change that adds untested code can turn the CI red.
 
 | Job | What it runs |
 |---|---|
-| `Extension (types, lint, tests, coverage, build)` | `pnpm install --frozen-lockfile`, `check:types`, `lint`, `test:coverage`, `build` |
+| `Extension (overrides, types, lint, tests, coverage, build)` | `pnpm install --frozen-lockfile`, `check:overrides`, `check:types`, `lint`, `test:coverage`, `build` |
 | `Standalone app (lint, tests, coverage, build)` | `npm ci`, `lint`, `test:coverage`, `build` |
 
 Releases are separate: `.github/workflows/release.yml` builds the extension zip

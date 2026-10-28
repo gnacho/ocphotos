@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   extension:
-    name: Extension (types, lint, tests, coverage, build)
+    name: Extension (overrides, types, lint, tests, coverage, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,6 +37,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Overrides guard
+        run: pnpm check:overrides
 
       - name: Type check
         run: pnpm check:types
