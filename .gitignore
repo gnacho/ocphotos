@@ -6,6 +6,7 @@ dist/
 build/
 *.tsbuildinfo
 .__mf__temp/
+coverage/
 
 # Logs
 *.log
