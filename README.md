@@ -130,7 +130,43 @@ cd ocphotos
 pnpm install
 pnpm build        # pnpm build:w to watch
 pnpm check:types
+pnpm lint
+pnpm test:unit
+pnpm test:coverage
 ```
+
+The suite runs on Vitest with happy-dom. `pnpm test:coverage` adds a V8 coverage
+report and fails when the totals drop below the thresholds declared in
+`ocphotos/vitest.config.ts`: 75 % statements, 58 % branches, 56 % functions and
+78 % lines overall, with stricter floors for `src/composables/**` and
+`src/components/**`.
+
+```bash
+# standalone app
+cd app
+npm install
+npm run dev
+npm run lint
+npm run test:coverage
+```
+
+The app suite runs on jsdom and measures only the files that hold logic
+(`src/lib/opencloud.ts`, `src/lib/store.tsx`, `src/lib/groupByDay.ts` and
+`src/hooks/useStore.ts`). Its thresholds live in `app/vitest.config.ts`. The
+shadcn components under `src/components/ui/` are vendored and excluded.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`,
+always with Node 24. It has two jobs:
+
+- `Extension (types, lint, tests, coverage, build)` installs with a frozen
+  lockfile, then runs types, lint, tests with coverage and the build.
+- `Standalone app (lint, tests, coverage, build)` runs `npm ci`, then lint, tests
+  with coverage and the build.
+
+A red check means one of those steps failed. Coverage is part of the build, so
+adding code without tests can turn the CI red.
 
 ## License
 

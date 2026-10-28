@@ -30,7 +30,10 @@ session bearer and the service validates it against OpenCloud's Graph `/me`.
 - Tooling: **pnpm 10** (workspace), **Vitest 4** + `@vue/test-utils` +
   `happy-dom`, **vue-tsc 3**, **ESLint 10** with `@opencloud-eu/eslint-config`,
   **Prettier 3**.
-- `pnpm check:types`, `pnpm lint`, `pnpm build`, `pnpm test:unit` (Vitest).
+- `pnpm check:types`, `pnpm lint`, `pnpm build`, `pnpm test:unit` (Vitest) and
+  `pnpm test:coverage`. The suite runs on happy-dom and the coverage thresholds
+  (75 / 58 / 56 / 78 overall, stricter for `src/composables/**` and
+  `src/components/**`) live in `vitest.config.ts`.
 
 ## Companion backend (gnacho/ocapps, not in this repo)
 
@@ -47,7 +50,12 @@ session bearer and the service validates it against OpenCloud's Graph `/me`.
 
 ## Standalone variant (`app/` + `app/server-go/`)
 
-- **React 19** + **TypeScript 5.9** + **Vite 7** + **Tailwind CSS 3**.
+- **React 19** + **TypeScript 5.9** + **Vite 8** + **Tailwind CSS 4**.
+- Tooling: **Vitest 4** + **jsdom** + **Testing Library**. `npm run test` and
+  `npm run test:coverage` cover the files that hold logic (`src/lib/opencloud.ts`,
+  `src/lib/store.tsx`, `src/lib/groupByDay.ts`, `src/hooks/useStore.ts`), with
+  thresholds in `vitest.config.ts`. The vendored shadcn components under
+  `src/components/ui/` are excluded from the measure.
 - **Radix UI** primitives (`@radix-ui/react-*`) with class-variance-authority,
   tailwind-merge, clsx, cmdk, vaul, sonner, next-themes.
 - **react-router 7**, **react-hook-form 7** + **zod 4** + `@hookform/resolvers`,
@@ -96,6 +104,20 @@ which is the only fix for the braces stack-exhaustion advisory
 zero vulnerabilities. `app/server-go/`: modernc.org/sqlite 1.38 -> 1.60,
 x/image 0.30 -> 0.46, h265 0.2.2 -> 0.2.3 available (dependabot handles Go
 updates via PR, e.g. x/image 0.41.0 landed in #7).
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request, on pushes to `main` and
+on manual dispatch, with Node 24 in both jobs. Coverage is enforced inside the
+build, so a change that adds untested code can turn the CI red.
+
+| Job | What it runs |
+|---|---|
+| `Extension (types, lint, tests, coverage, build)` | `pnpm install --frozen-lockfile`, `check:types`, `lint`, `test:coverage`, `build` |
+| `Standalone app (lint, tests, coverage, build)` | `npm ci`, `lint`, `test:coverage`, `build` |
+
+Releases are separate: `.github/workflows/release.yml` builds the extension zip
+when a `ocphotos-v*` tag is pushed.
 
 ## Security notes (Dependabot)
 
