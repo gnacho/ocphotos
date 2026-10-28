@@ -151,7 +151,7 @@ export default defineComponent({
 
     // layout justificado: filas de alto fijo, ancho proporcional al aspect ratio
     const layoutRows = (list: Photo[]): RowItem[][] => {
-      const cw = containerW.value || 900
+      const cw = containerW.value > 0 ? containerW.value : 900
       const rows: RowItem[][] = []
       let row: Photo[] = []
       let arSum = 0
@@ -239,11 +239,12 @@ export default defineComponent({
       } catch {
         /* sin tira de highlights si falla */
       }
+      const measure = () => {
+        if (scrollEl.value) containerW.value = Math.max(0, scrollEl.value.clientWidth - 16)
+      }
       if (scrollEl.value) {
-        containerW.value = scrollEl.value.clientWidth - 16
-        ro = new ResizeObserver(() => {
-          if (scrollEl.value) containerW.value = scrollEl.value.clientWidth - 16
-        })
+        measure()
+        ro = new ResizeObserver(measure)
         ro.observe(scrollEl.value)
       }
       const obs = new IntersectionObserver(
