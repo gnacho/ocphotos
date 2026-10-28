@@ -5,6 +5,7 @@
     </div>
 
     <div v-if="loading" class="memories-note" v-text="$gettext('Loading…')" />
+    <div v-else-if="error" class="memories-note memories-error" v-text="error" />
     <div v-else-if="years.length === 0" class="memories-note" v-text="$gettext('No memories from previous years today')" />
 
     <div v-else class="memories-scroll">
@@ -38,7 +39,7 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useGettext } from 'vue3-gettext'
-import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, errorMessage, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
@@ -49,6 +50,7 @@ export default defineComponent({
     const { fetchOnThisDay, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
     const yearsAgo = (n: number) => $gettext(n === 1 ? '%{n} year ago' : '%{n} years ago', { n })
     const loading = ref(true)
+    const error = ref<string | null>(null)
     const photos = ref<Photo[]>([])
     const currentYear = new Date().getFullYear()
 
@@ -82,12 +84,14 @@ export default defineComponent({
     onMounted(async () => {
       try {
         photos.value = await fetchOnThisDay()
+      } catch (e) {
+        error.value = errorMessage(e)
       } finally {
         loading.value = false
       }
     })
 
-    return { loading, years, currentYear, yearsAgo, viewerList, viewerIndex, openViewer, thumbSrc, ensurePreview, ensureOriginal }
+    return { loading, error, years, currentYear, yearsAgo, viewerList, viewerIndex, openViewer, thumbSrc, ensurePreview, ensureOriginal }
   }
 })
 </script>
@@ -100,6 +104,7 @@ export default defineComponent({
 }
 .memories-toolbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .memories-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
+.memories-error { color: var(--oc-role-error, #ba1a1a); }
 .memories-scroll { flex: 1; overflow-y: auto; padding: 16px; }
 .memories-year { margin-bottom: 24px; }
 .memories-hero {

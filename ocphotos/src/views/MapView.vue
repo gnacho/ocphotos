@@ -6,6 +6,7 @@
     </div>
 
     <div v-if="loading" class="map-note" v-text="$gettext('Loading…')" />
+    <div v-else-if="error" class="map-note map-error" v-text="error" />
     <div v-else-if="places.length === 0" class="map-note" v-text="$gettext('No photos with location data')" />
     <div v-show="places.length > 0" ref="mapEl" class="map-canvas" />
 
@@ -26,7 +27,7 @@ import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref } 
 import { useGettext } from 'vue3-gettext'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { usePhotoLibrary, Place, Photo } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, errorMessage, Place, Photo } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
@@ -37,6 +38,7 @@ export default defineComponent({
     const { fetchPlaces, placeAssets, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
     const placesLabel = computed(() => `${places.value.length} ${$gettext(places.value.length === 1 ? 'place' : 'places')}`)
     const loading = ref(true)
+    const error = ref<string | null>(null)
     const places = ref<Place[]>([])
     const mapEl = ref<HTMLElement | null>(null)
     let map: L.Map | null = null
@@ -71,10 +73,14 @@ export default defineComponent({
         })
           .addTo(map!)
           .on('click', async () => {
-            const list = await placeAssets(pl.lat, pl.lon)
-            if (!list.length) return
-            viewerList.value = list
-            viewerIndex.value = 0
+            try {
+              const list = await placeAssets(pl.lat, pl.lon)
+              if (!list.length) return
+              viewerList.value = list
+              viewerIndex.value = 0
+            } catch (e) {
+              error.value = errorMessage(e)
+            }
           })
       }
       if (bounds.isValid()) map.fitBounds(bounds, { maxZoom: 13, padding: [50, 50] })
@@ -86,6 +92,8 @@ export default defineComponent({
         places.value = await fetchPlaces()
         // miniaturas de portada antes de pintar los marcadores
         for (const pl of places.value) if (pl.coverId) await ensurePreview({ id: pl.coverId } as Photo, 400)
+      } catch (e) {
+        error.value = errorMessage(e)
       } finally {
         loading.value = false
       }
@@ -97,7 +105,7 @@ export default defineComponent({
       map = null
     })
 
-    return { loading, places, placesLabel, mapEl, viewerList, viewerIndex, ensurePreview, ensureOriginal }
+    return { loading, error, places, placesLabel, mapEl, viewerList, viewerIndex, ensurePreview, ensureOriginal }
   }
 })
 </script>
@@ -111,6 +119,7 @@ export default defineComponent({
 .map-toolbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .map-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
 .map-note { padding: 32px; text-align: center; color: var(--oc-role-on-surface-variant, #40484c); }
+.map-error { color: var(--oc-role-error, #ba1a1a); }
 .map-canvas { flex: 1; min-height: 0; }
 </style>
 

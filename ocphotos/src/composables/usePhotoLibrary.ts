@@ -7,6 +7,9 @@ import type { ProcessorType } from '@opencloud-eu/web-pkg'
 const SERVICE_BASE = '/ocphotos-api'
 const PAGE_SIZE = 300
 
+/** Texto presentable de un fallo de red, para pintarlo en la vista en vez de dejarla en blanco. */
+export const errorMessage = (e: unknown): string => (e as { message?: string } | null)?.message ?? String(e)
+
 export interface Photo {
   id: number
   path: string
@@ -168,7 +171,7 @@ export function usePhotoLibrary() {
       state.photos.value = reset ? list : [...state.photos.value, ...list]
       state.exhausted.value = list.length < PAGE_SIZE
     } catch (e: any) {
-      state.error.value = e?.message ?? String(e)
+      state.error.value = errorMessage(e)
     } finally {
       state.loading.value = false
     }
