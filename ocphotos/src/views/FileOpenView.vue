@@ -47,6 +47,8 @@ export default defineComponent({
       const fid = typeof fileId.value === 'string' && fileId.value ? fileId.value : undefined
       try {
         photo.value = await resolveFromFiles(dai, fid)
+      } catch {
+        photo.value = null
       } finally {
         loading.value = false
       }
