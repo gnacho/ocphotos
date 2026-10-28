@@ -3,7 +3,7 @@
 # Run:    ver docker-compose.yml
 
 # --- etapa 1: frontend ---
-FROM node:20-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci
