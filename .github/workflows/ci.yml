@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   extension:
-    name: Extension (types, lint, tests, build)
+    name: Extension (types, lint, tests, coverage, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,8 +44,8 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Unit tests
-        run: pnpm test:unit
+      - name: Unit tests and coverage
+        run: pnpm test:coverage
 
       - name: Build
         run: pnpm build
