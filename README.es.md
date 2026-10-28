@@ -75,7 +75,7 @@ componentes de shadcn en `src/components/ui/` son vendorizados y quedan fuera.
 `.github/workflows/ci.yml` se ejecuta en cada pull request y en cada push a
 `main`, siempre con Node 24. Tiene dos trabajos:
 
-- `Extension (types, lint, tests, coverage, build)` instala con el lockfile
+- `Extension (overrides, types, lint, tests, coverage, build)` instala con el lockfile
   congelado y luego ejecuta tipos, lint, tests con cobertura y el build.
 - `Standalone app (lint, tests, coverage, build)` ejecuta `npm ci` y luego lint,
   tests con cobertura y el build.
