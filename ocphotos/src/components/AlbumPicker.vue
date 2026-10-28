@@ -49,12 +49,16 @@ export default defineComponent({
     const newName = ref('')
 
     onMounted(async () => {
-      albums.value = await fetchAlbums()
+      albums.value = await fetchAlbums().catch(() => [] as Album[])
     })
 
     const add = async () => {
       if (!selected.value) return
-      await addToAlbum(selected.value, [props.assetId])
+      try {
+        await addToAlbum(selected.value, [props.assetId])
+      } catch {
+        return
+      }
       emit('added')
       emit('close')
     }
@@ -62,9 +66,13 @@ export default defineComponent({
     const createAndAdd = async () => {
       const name = newName.value.trim()
       if (!name) return
-      const id = await createAlbum(name)
-      newName.value = ''
-      await addToAlbum(id, [props.assetId])
+      try {
+        const id = await createAlbum(name)
+        newName.value = ''
+        await addToAlbum(id, [props.assetId])
+      } catch {
+        return
+      }
       emit('added')
       emit('close')
     }
