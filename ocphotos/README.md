@@ -2,8 +2,9 @@
 
 Extensión web **nativa** de OpenCloud (Vue 3 + `@opencloud-eu/web-pkg`), construida
 sobre el skeleton oficial. Sin iframe ni tokens propios: usa la **sesión del host**.
-El índice y las miniaturas los sirve el **photos-service** (`app/server-go`),
-expuesto en el mismo origen como `/ocphotos-api/`.
+El índice y las miniaturas los sirve el módulo `photos` de
+[ocapps](https://github.com/gnacho/ocapps), expuesto en el mismo origen como
+`/ocphotos-api/`. Este repo no contiene backend.
 
 ## Qué hace (Etapa 2, con backend)
 
@@ -39,14 +40,16 @@ expuesto en el mismo origen como `/ocphotos-api/`.
   del host).
 - Registrada en el **conmutador de aplicaciones** (appMenuItem).
 
-Pendiente de la Etapa 3: caras/CLIP (microservicio ML), álbumes, posters de vídeo.
+Pendiente: caras/CLIP (microservicio ML).
 
 ## Desarrollo
 
 ```bash
 pnpm install && pnpm build:w     # watch
-docker compose up                # OpenCloud dev en https://host.docker.internal:9200 (admin/admin)
 ```
+
+Para probar contra una instancia real, copia `dist/` a la carpeta de apps de OpenCloud y
+recarga. No hay entorno Docker en este repo.
 
 ## Build e instalación en tu instancia
 
@@ -55,8 +58,7 @@ pnpm build    # genera dist/ (module federation: manifest.json + js/)
 ```
 
 Despliegue: servir `dist/` como estático y registrar la app en la configuración
-de OpenCloud Web (`apps.yaml` / config del servicio `web`, sección `external_apps`
-o apps cargadas por volumen — igual que `web-app-skeleton` en `dev/docker/opencloud/apps.yaml`).
+de OpenCloud Web (`apps.yaml` / config del servicio `web`, sección `external_apps`).
 El tipo-check pasa limpio (`pnpm check:types`).
 
 ## Roadmap

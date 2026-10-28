@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { useAuthStore } from '@opencloud-eu/web-pkg'
 import type { ProcessorType } from '@opencloud-eu/web-pkg'
 
-// backend photos-service (mismo origen, vía NPM). Mantiene el índice (EXIF, geo,
+// backend del servicio de fotos (mismo origen). Mantiene el índice (EXIF, geo,
 // favoritos) y sirve miniaturas (incluido HEIC) y originales.
 const SERVICE_BASE = '/ocphotos-api'
 const PAGE_SIZE = 300

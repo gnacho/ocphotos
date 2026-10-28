@@ -1,16 +1,15 @@
 # Stack
 
 What this repository uses, piece by piece, plus the dependency update status.
-Pinned versions below are the ones in `package.json` ranges and `go.mod`;
-the lockfiles carry the exact resolved versions.
+Pinned versions below are the ones in the `package.json` ranges, and the lockfiles
+carry the exact resolved versions.
 
 ## Repository layout
 
 | Path | What it is | Status |
 |---|---|---|
 | `ocphotos/` | Native OpenCloud web extension (Vue 3, session-based, no iframe). This is the product. | active |
-| `app/` | Standalone single-tenant PWA (React) served by its own Go binary. Earlier variant, same features. | maintenance |
-| `app/server-go/` | Go backend for the standalone PWA (`photos-service`, single-tenant, embedded SQLite). | maintenance |
+| `app/` | Standalone PWA (React), earlier variant with the same features. It talks to the same backend. | maintenance |
 | [gnacho/ocapps](https://github.com/gnacho/ocapps) | Companion Go backend for the extension (multi-tenant, one isolated index per user). Not in this repo. | active |
 
 The extension never stores credentials: it calls the service with the host
@@ -37,7 +36,7 @@ session bearer and the service validates it against OpenCloud's Graph `/me`.
 
 ## Companion backend (gnacho/ocapps, not in this repo)
 
-- **Go 1.26** (module `go 1.26.8`), single binary, no CGO.
+- **Go 1.26** (module `go 1.26.10`), single binary, no CGO.
 - **modernc.org/sqlite** (embedded SQLite, `go 1.26` toolchain): one isolated
   index per user (`oc_id`), cursor pagination, soft-deletes.
 - **rwcarlsen/goexif**: EXIF extraction (date, camera, GPS) via a vendored fork
@@ -48,7 +47,7 @@ session bearer and the service validates it against OpenCloud's Graph `/me`.
 - Reverse geocoding: **Nominatim** (HTTP, cached in SQLite).
 - Video posters: **ffmpeg** (external binary, called by the service).
 
-## Standalone variant (`app/` + `app/server-go/`)
+## Standalone variant (`app/`)
 
 - **React 19** + **TypeScript 5.9** + **Vite 8** + **Tailwind CSS 4**.
 - Tooling: **Vitest 4** + **jsdom** + **Testing Library**. `npm run test` and
@@ -92,9 +91,9 @@ regenerates that lockfile.
 
 The service that runs in production is the `photos` module of
 [ocapps](https://github.com/gnacho/ocapps), on Go 1.26.10 with `golang.org/x/net`
-0.62.0 (that floor closes GO-2026-6617 and GO-2026-6866). `app/server-go` in this repo
-holds the same service as an older copy and only received the XMP writer, so treat
-ocapps as the source of truth for the backend.
+0.62.0 (that floor closes GO-2026-6617 and GO-2026-6866). It is the only copy: this repo
+used to keep a second one under `app/server-go` and it was removed because it had already
+diverged from what runs.
 
 ### Standalone variant (`app/`)
 
@@ -110,9 +109,7 @@ Held back: TypeScript 5.9.3, because typescript-eslint 8.71 peer-requires
 The Tailwind 4 migration also removed the whole Tailwind 3 toolchain chain,
 which is the only fix for the braces stack-exhaustion advisory
 (GHSA-vfj7-8cjw-p6xm, no patched release): `npm audit` in `app/` now reports
-zero vulnerabilities. `app/server-go/`: modernc.org/sqlite 1.38 -> 1.60,
-x/image 0.30 -> 0.46, h265 0.2.2 -> 0.2.3 available (dependabot handles Go
-updates via PR, e.g. x/image 0.41.0 landed in #7).
+zero vulnerabilities.
 
 ## Continuous integration
 
@@ -143,7 +140,6 @@ Resolved 2026-10-05 (now zero open alerts):
   Bumped in both lockfiles (`app/` via npm audit fix, extension via override).
 - `ws`: alert covered `ws < 5.2.5` but the lockfile only has 8.x copies;
   dismissed as not used.
-- `golang.org/x/image 0.30.0` in `app/server-go`: bumped to 0.41.0 (#7).
 
 Resolved by the Tailwind 4 migration (#11): the Tailwind 3 toolchain is
 gone from `app/`, so the `braces` advisory chain no longer applies and

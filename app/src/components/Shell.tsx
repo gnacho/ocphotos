@@ -53,7 +53,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
             className="mb-5 space-y-3 rounded-xl border border-app p-4"
             onSubmit={(e) => { e.preventDefault(); connectService(svcToken) }}
           >
-            <p className="text-sm font-medium text-main">Modo producción (photos-service)</p>
+            <p className="text-sm font-medium text-main">Modo producción (servicio de fotos)</p>
             <div>
               <label className="mb-1 block text-xs text-dim">Token del servicio (MEMORIES_TOKEN; vacío si no lo definiste)</label>
               <input value={svcToken} onChange={(e) => setSvcToken(e.target.value)} type="password"

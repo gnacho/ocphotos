@@ -33,37 +33,6 @@ updates:
           - minor
           - patch
 
-  - package-ecosystem: gomod
-    directory: /app/server-go
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: chore(deps)
-    groups:
-      server-minor-and-patch:
-        patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
-
-  - package-ecosystem: docker
-    directory: /app
-    schedule:
-      interval: monthly
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: chore(deps)
-    groups:
-      docker-minor-and-patch:
-        patterns:
-          - '*'
-        update-types:
-          - minor
-          - patch
-
   - package-ecosystem: github-actions
     directory: /
     schedule:

@@ -133,30 +133,21 @@ The app registers itself in the app switcher as `app.ocphotos.menuItem`.
   Restart OpenCloud after changing `apps.yaml`. A user's pick in the UI takes
   precedence over the configured default.
 
-## 3. photos-service (HEIC thumbnails + EXIF backend)
+## 3. Backend
 
-OpenCloud's thumbnails service does not decode HEIC (only png/jpg/gif/tiff/bmp),
-so the extension falls back to the `photos-service`, which decodes HEIC/HEIF with
-a pure-Go decoder (`gen2brain/h265`, no CGo, no libvips).
+The extension needs the photo service, which lives in
+[ocapps](https://github.com/gnacho/ocapps) as the `photos` module. This repo does not
+contain it and does not build it: install and upgrade it following the ocapps docs.
 
-- Host: static binary at `/usr/local/bin/photos-service`, system user
-  `ocphotos`, data in `/var/lib/ocphotos`, env in `/etc/ocphotos/env` (640),
-  unit `ocphotos.service`, port `:8097`.
-- Env: `OC_BASE_URL=http://127.0.0.1:9200`, `OC_USER`, `OC_APP_TOKEN`,
-  `MEMORIES_TOKEN`, `SCAN_ROOT=Fotos`, `SCAN_EVERY=30m`, `DATA_DIR`.
-- Exposed by the reverse proxy as `/ocphotos-api/` ->
-  `http://<service-host>:8097/` (trailing slash strips the prefix).
-- The extension calls `/ocphotos-api/api/thumb?path=/Fotos/x.heic&w=400&etag=...`
-  with the host session Bearer. The service validates it against Graph `/me` and
-  only answers for its own user (single-tenant).
+What matters from here:
 
-Deploy the binary:
+- The reverse proxy routes `/ocphotos-api/` to that service (snippet in the root README).
+- The extension sends the host session bearer and the service validates it against
+  Graph `/me`, so each user gets their own index.
+- HEIC/HEIF thumbnails, EXIF, video posters and the XMP sidecars all come from there.
+- OpenCloud's own thumbnail service does not decode HEIC (only png, jpg, gif, tiff and
+  bmp), which is why the extension asks the service instead.
 
-```bash
-cd app/server-go
-CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /tmp/photos-service ./cmd/photos-service
-# stop the service first: pushing over a running binary fails with "Text file busy"
-systemctl stop ocphotos
-# copy /tmp/photos-service to /usr/local/bin/photos-service (0755), then:
-systemctl start ocphotos
-```
+If the host still has the old `photos-service` unit (`/usr/local/bin/photos-service`,
+port `:8097`), that is the September binary and nothing updates it. Point the proxy at
+ocapps and remove the unit, otherwise two indexes drift apart.

@@ -11,4 +11,4 @@
 
 1. **Personas (reconocimiento facial)**. Es el único frente grande que queda. Necesita microservicio de ML aparte, tablas de caras en el servicio, endpoints de personas y la integración en la interfaz, que hoy usa datos demo.
 2. **Cobertura de las vistas**. Las pantallas menos cubiertas están entre el 42 % y el 60 %. Subirlas permite después elevar los umbrales de CI sin que el margen se vuelva frágil.
-3. **Una sola copia del servicio**. `app/server-go` en este repo y el módulo `internal/photos` de `ocapps` son el mismo servicio y ya han divergido: la lectura de sidecars solo existe en `ocapps`, que es lo que corre. Hay que decidir si este repo se queda con el cliente y los tipos y el servicio se archiva aquí, o si se sincroniza en cada cambio. Mientras siga habiendo dos copias, cada arreglo hay que hacerlo dos veces.
+3. **Nada pendiente aquí del servicio.** La copia de `app/server-go`, su Dockerfile y la imagen todo en uno se retiraron el 28 de octubre, así que el backend se desarrolla solo en `ocapps`. Este repo se queda con la extensión y la PWA.
