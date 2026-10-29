@@ -10,7 +10,9 @@ const LOGIC = [
   'src/lib/opencloud.ts',
   'src/lib/store.tsx',
   'src/lib/groupByDay.ts',
+  'src/lib/images.ts',
   'src/hooks/useStore.ts',
+  'src/hooks/useImageUrl.ts',
 ]
 
 export default defineConfig({

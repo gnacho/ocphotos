@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Heart, Play } from 'lucide-react'
 import type { DayBucket, PhotoAsset } from '@/lib/types'
 import { useStore } from '@/hooks/useStore'
+import { AssetImage } from '@/components/AssetImage'
 
 const fmtDay = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -13,7 +14,7 @@ function Thumb({ asset, onClick }: { asset: PhotoAsset; onClick: () => void }) {
       className="group relative m-[1.5px] block grow overflow-hidden bg-raised focus:outline-none"
       style={{ aspectRatio: `${asset.width}/${asset.height}`, flexGrow: ar * 100, flexBasis: ar * 140 }}
     >
-      <img
+      <AssetImage
         src={asset.thumbUrl}
         alt={asset.filename}
         loading="lazy"

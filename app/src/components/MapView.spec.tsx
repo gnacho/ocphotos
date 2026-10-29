@@ -168,12 +168,12 @@ describe('MapView', () => {
     expect(screen.getByText(/2 fotos con ubicación/)).toBeTruthy()
   })
 
-  it('pone un marcador por foto con coordenadas, con su miniatura y su tooltip', () => {
+  it('pone un marcador por foto con coordenadas, con su miniatura y su tooltip', async () => {
     h.store = store({
       filteredAssets: [photo('a', { lat: 42.2, lon: -8.7, place: 'Vigo' }), photo('b', { lat: 43.3, lon: -8.1 })],
     })
     render(<MapView />)
-    expect(L.state.markers).toHaveLength(2)
+    await waitFor(() => expect(L.state.markers).toHaveLength(2))
     expect(L.state.markers[0].latlng).toEqual([42.2, -8.7])
     expect(L.state.markers[0].tooltip).toBe('Vigo')
     expect(L.state.markers[1].tooltip).toBe('b.jpg')
@@ -186,22 +186,24 @@ describe('MapView', () => {
     expect(L.state.markers).toHaveLength(0)
   })
 
-  it('abre el visor al pulsar un marcador', () => {
+  it('abre el visor al pulsar un marcador', async () => {
     const openViewer = vi.fn()
     h.store = store({
       openViewer,
       filteredAssets: [photo('a', { lat: 42.2, lon: -8.7 }), photo('b'), photo('c', { lat: 43.3, lon: -8.1 })],
     })
     render(<MapView />)
+    await waitFor(() => expect(L.state.markers).toHaveLength(2))
     L.state.markers[1].click!()
     const [list, index] = openViewer.mock.calls[0]
     expect(list.map((p: PhotoAsset) => p.id)).toEqual(['a', 'c'])
     expect(index).toBe(1)
   })
 
-  it('ajusta la vista solo cuando hay más de una coordenada', () => {
+  it('ajusta la vista solo cuando hay más de una coordenada', async () => {
     h.store = store({ filteredAssets: [photo('a', { lat: 42.2, lon: -8.7 })] })
     const single = render(<MapView />)
+    await waitFor(() => expect(L.state.markers).toHaveLength(1))
     expect(L.state.maps[0].fitBounds).not.toHaveBeenCalled()
     single.unmount()
 
@@ -209,20 +211,24 @@ describe('MapView', () => {
       filteredAssets: [photo('a', { lat: 42.2, lon: -8.7 }), photo('b', { lat: 43.3, lon: -8.1 })],
     })
     render(<MapView />)
-    expect(L.state.maps[1].fitBounds).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(L.state.maps[1].fitBounds).toHaveBeenCalledTimes(1))
   })
 
-  it('pide las coordenadas al servicio en modo producción', async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            assets: [{ id: 5, path: '/Fotos/g.jpg', filename: 'g.jpg', takenAt: 1700000000, lat: 42.5, lon: -8.9, place: 'Santiago' }],
-          }),
-      }),
-    )
+  it('pide las coordenadas al servicio en modo producción y descarga la miniatura con el bearer', async () => {
+    const fetchMock = vi.fn((input: string) => {
+      if (input === '/api/geo') {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              assets: [{ id: 5, path: '/Fotos/g.jpg', filename: 'g.jpg', takenAt: 1700000000, lat: 42.5, lon: -8.9, place: 'Santiago' }],
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(['x'])) })
+    })
     vi.stubGlobal('fetch', fetchMock)
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: vi.fn(() => 'blob:thumb') })
     h.store = store({ mode: 'service', serviceToken: 'tok' })
     render(<MapView />)
 
@@ -231,7 +237,11 @@ describe('MapView', () => {
     expect(url).toBe('/api/geo')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
     expect(L.state.markers[0].tooltip).toBe('Santiago')
-    expect(L.state.markers[0].iconHtml).toContain('/api/assets/5/thumb?w=100?token=tok')
+
+    const thumb = fetchMock.mock.calls.find(([u]) => String(u).includes('/thumb')) as unknown as [string, RequestInit]
+    expect(thumb[0]).toBe('/api/assets/5/thumb?w=100')
+    expect((thumb[1].headers as Record<string, string>).Authorization).toBe('Bearer tok')
+    expect(L.state.markers[0].iconHtml).toContain('blob:thumb')
   })
 
   it('destruye el mapa y deja de escuchar el tema al desmontarse', () => {

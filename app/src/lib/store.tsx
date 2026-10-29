@@ -4,6 +4,7 @@ import { generateDemoData } from './demoData'
 import { OpenCloudClient, entriesToAssets } from './opencloud'
 import type { DavEntry } from './opencloud'
 import { groupByDay } from './groupByDay'
+import { clearImageCache } from './images'
 import { StoreCtx } from '@/hooks/useStore'
 
 /**
@@ -34,8 +35,7 @@ interface ServiceAsset {
   favorite: boolean
 }
 
-function svcToAsset(a: ServiceAsset, token: string): PhotoAsset {
-  const t = token ? `?token=${encodeURIComponent(token)}` : ''
+function svcToAsset(a: ServiceAsset): PhotoAsset {
   return {
     id: String(a.id),
     path: a.path,
@@ -43,8 +43,10 @@ function svcToAsset(a: ServiceAsset, token: string): PhotoAsset {
     takenAt: new Date(a.takenAt * 1000),
     width: a.width || 1600,
     height: a.height || 1200,
-    thumbUrl: `/api/assets/${a.id}/thumb?w=400${token ? `&token=${encodeURIComponent(token)}` : ''}`,
-    fullUrl: `/api/assets/${a.id}/original${t}`,
+    // Sin token en la URL: la API solo lo acepta en la cabecera y las pinta
+    // AssetImage descargando el blob. Ver lib/images.ts.
+    thumbUrl: `/api/assets/${a.id}/thumb?w=400`,
+    fullUrl: `/api/assets/${a.id}/original`,
     camera: a.camera,
     lens: a.lens,
     iso: a.iso,
@@ -139,7 +141,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (queryRef.current.trim()) params.set('q', queryRef.current.trim())
       const res = await svcFetch(`/api/assets?${params}`, token)
       const json = (await res.json()) as { assets: ServiceAsset[] }
-      const mapped = json.assets.map((a) => svcToAsset(a, token))
+      const mapped = json.assets.map((a) => svcToAsset(a))
       setAssets((prev) => (reset ? mapped : [...prev, ...mapped]))
       if (json.assets.length > 0) {
         const last = json.assets[json.assets.length - 1]
@@ -263,6 +265,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(() => {
     localStorage.removeItem(STORED)
     localStorage.removeItem(SVC_TOKEN)
+    clearImageCache()
     setConnection({ mode: 'demo', baseUrl: '', username: '', appToken: '', status: 'idle' })
     setAssets(demo.assets)
     setMode('demo')

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, Heart, Info, MapPin, X } from 'lucide-react'
 import { useStore } from '@/hooks/useStore'
+import { useImageUrl } from '@/hooks/useImageUrl'
 
 export default function Viewer() {
   const { viewerList, viewerIndex, closeViewer, openViewer, toggleFavorite, people } = useStore()
   const [showInfo, setShowInfo] = useState(false)
   const asset = viewerIndex !== null ? viewerList[viewerIndex] : null
+  // El hook va antes del retorno condicional y resuelve el bearer en una URL pintable.
+  const fullUrl = useImageUrl(asset?.fullUrl ?? '')
 
   const next = useCallback(() => {
     if (viewerIndex !== null && viewerIndex < viewerList.length - 1) openViewer(viewerList, viewerIndex + 1)
@@ -38,7 +41,7 @@ export default function Viewer() {
           <button onClick={() => toggleFavorite(asset.id)} className="rounded-full p-2 hover:bg-white/10" aria-label="Favorito">
             <Heart size={20} className={asset.favorite ? 'fill-rose-500 text-rose-500' : ''} />
           </button>
-          <a href={asset.fullUrl} download={asset.filename} className="rounded-full p-2 hover:bg-white/10" aria-label="Descargar">
+          <a href={fullUrl || undefined} download={asset.filename} className="rounded-full p-2 hover:bg-white/10" aria-label="Descargar">
             <Download size={20} />
           </a>
           <button onClick={() => setShowInfo((s) => !s)} className="rounded-full p-2 hover:bg-white/10" aria-label="Información">
@@ -54,7 +57,7 @@ export default function Viewer() {
             <ChevronLeft size={26} />
           </button>
         )}
-        <img src={asset.fullUrl} alt={asset.filename} className="max-h-full max-w-full object-contain" />
+        <img src={fullUrl || undefined} alt={asset.filename} className="max-h-full max-w-full object-contain" />
         {viewerIndex! < viewerList.length - 1 && (
           <button onClick={next} className="absolute right-2 rounded-full bg-black/50 p-2 text-white hover:bg-black/80" aria-label="Siguiente">
             <ChevronRight size={26} />
