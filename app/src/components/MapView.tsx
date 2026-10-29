@@ -15,20 +15,10 @@ export default function MapView() {
   useEffect(() => {
     if (!ref.current || mapRef.current) return
     const map = L.map(ref.current, { center: [35, 0], zoom: 2, zoomControl: true, attributionControl: false })
-    const tiles = { layer: null as L.TileLayer | null }
-    const applyTiles = (theme: string) => {
-      tiles.layer?.remove()
-      tiles.layer = L.tileLayer(
-        `https://{s}.basemaps.cartocdn.com/${theme === 'dark' ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`,
-        { maxZoom: 19 },
-      ).addTo(map)
-    }
-    applyTiles(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
-    const onTheme = (e: Event) => applyTiles((e as CustomEvent).detail)
-    window.addEventListener('ocm-theme', onTheme)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
     layerRef.current = L.layerGroup().addTo(map)
     mapRef.current = map
-    return () => { window.removeEventListener('ocm-theme', onTheme); map.remove(); mapRef.current = null }
+    return () => { map.remove(); mapRef.current = null }
   }, [])
 
   useEffect(() => {
@@ -67,7 +57,7 @@ export default function MapView() {
     <div className="flex h-full flex-col">
       <div ref={ref} className="min-h-0 flex-1" />
       <p className="bg-app px-4 py-2 text-xs text-faint">
-        {geoAssets.filter((a) => a.lat !== undefined).length} fotos con ubicación · © OpenStreetMap · © CARTO
+        {geoAssets.filter((a) => a.lat !== undefined).length} fotos con ubicación · © OpenStreetMap
       </p>
     </div>
   )

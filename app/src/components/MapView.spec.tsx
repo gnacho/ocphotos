@@ -139,25 +139,27 @@ afterEach(() => {
 })
 
 describe('MapView', () => {
-  it('crea el mapa y carga las teselas claras por defecto', () => {
+  it('crea el mapa y carga las teselas de OpenStreetMap', () => {
     render(<MapView />)
     expect(L.state.maps).toHaveLength(1)
     expect(L.state.maps[0].options).toMatchObject({ center: [35, 0], zoom: 2 })
-    expect(L.state.tiles[0].url).toContain('light_all')
+    expect(L.state.tiles).toHaveLength(1)
+    expect(L.state.tiles[0].url).toContain('tile.openstreetmap.org')
+    expect(L.state.tiles[0].url).not.toContain('carto')
   })
 
-  it('usa las teselas oscuras si el documento está en modo oscuro', () => {
+  it('usa las mismas teselas en modo oscuro, que el tema resuelve el CSS', () => {
     document.documentElement.classList.add('dark')
     render(<MapView />)
-    expect(L.state.tiles[0].url).toContain('dark_all')
+    expect(L.state.tiles).toHaveLength(1)
+    expect(L.state.tiles[0].url).toContain('tile.openstreetmap.org')
   })
 
-  it('cambia las teselas cuando cambia el tema', () => {
+  it('no añade capas de teselas cuando cambia el tema', () => {
     render(<MapView />)
     window.dispatchEvent(new CustomEvent('ocm-theme', { detail: 'dark' }))
-    expect(L.state.tiles).toHaveLength(2)
-    expect(L.state.tiles[0].removed).toBe(true)
-    expect(L.state.tiles[1].url).toContain('dark_all')
+    expect(L.state.tiles).toHaveLength(1)
+    expect(L.state.tiles[0].removed).toBeFalsy()
   })
 
   it('cuenta las fotos con ubicación', () => {
@@ -166,6 +168,8 @@ describe('MapView', () => {
     })
     render(<MapView />)
     expect(screen.getByText(/2 fotos con ubicación/)).toBeTruthy()
+    expect(screen.getByText(/© OpenStreetMap/)).toBeTruthy()
+    expect(screen.queryByText(/CARTO/)).toBeNull()
   })
 
   it('pone un marcador por foto con coordenadas, con su miniatura y su tooltip', async () => {
@@ -244,12 +248,10 @@ describe('MapView', () => {
     expect(L.state.markers[0].iconHtml).toContain('blob:thumb')
   })
 
-  it('destruye el mapa y deja de escuchar el tema al desmontarse', () => {
+  it('destruye el mapa al desmontarse', () => {
     const { unmount } = render(<MapView />)
     unmount()
     expect(L.state.maps[0].remove).toHaveBeenCalledTimes(1)
-
-    window.dispatchEvent(new CustomEvent('ocm-theme', { detail: 'dark' }))
     expect(L.state.tiles).toHaveLength(1)
   })
 
