@@ -1,6 +1,5 @@
 import {
   defineWebApplication,
-  ApplicationSetupOptions,
   Extension,
   AppMenuItemExtension,
   AppNavigationItem
@@ -13,7 +12,7 @@ import { useGettext } from 'vue3-gettext'
 import translations from '../l10n/translations.json'
 
 export default defineWebApplication({
-  setup(args) {
+  setup() {
     const { $gettext } = useGettext()
 
     const appInfo = {
@@ -223,7 +222,7 @@ export default defineWebApplication({
       }
     ]
 
-    const extensions = ({ applicationConfig }: ApplicationSetupOptions) => {
+    const extensions = () => {
       return computed<Extension[]>(() => {
         // NOTA F3(c): los metadatos de la foto (EXIF/tags/álbumes) se muestran en
         // un panel lateral PROPIO (PhotoDetailsPanel.vue, dentro de ViewerOverlay),
@@ -258,7 +257,7 @@ export default defineWebApplication({
       routes,
       navItems,
       translations,
-      extensions: extensions(args)
+      extensions: extensions()
     }
   }
 })

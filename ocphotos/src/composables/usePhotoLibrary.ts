@@ -1,6 +1,5 @@
 import { computed, ref } from 'vue'
 import { useAuthStore } from '@opencloud-eu/web-pkg'
-import type { ProcessorType } from '@opencloud-eu/web-pkg'
 
 // backend del servicio de fotos (mismo origen). Mantiene el índice (EXIF, geo,
 // favoritos) y sirve miniaturas (incluido HEIC) y originales.
@@ -298,7 +297,7 @@ export function usePhotoLibrary() {
   })
 
   /** Miniatura del backend (decodifica HEIC/HEIF). Devuelve un blob URL. */
-  const ensurePreview = async (p: Photo, size = 400, _processor?: ProcessorType): Promise<string> => {
+  const ensurePreview = async (p: Photo, size = 400): Promise<string> => {
     const key = `${p.id}|${size}`
     if (previews.value[key]) return previews.value[key]
     try {

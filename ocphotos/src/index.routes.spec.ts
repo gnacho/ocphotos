@@ -32,9 +32,9 @@ const isComponent = (value: unknown) => {
 
 const loadRoutes = async () => {
   const app = (await import('./index')).default as unknown as {
-    setup: (args: unknown) => { routes: Route[] }
+    setup: () => { routes: Route[] }
   }
-  return app.setup({ applicationConfig: {} }).routes
+  return app.setup().routes
 }
 
 describe('route components', () => {

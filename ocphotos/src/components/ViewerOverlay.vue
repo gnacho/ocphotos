@@ -1,5 +1,5 @@
 <template>
-  <div class="viewer" @keydown.esc="$emit('close')" tabindex="0" ref="root">
+  <div ref="root" class="viewer" tabindex="0" @keydown.esc="$emit('close')">
     <div class="viewer-top">
       <div class="viewer-meta">
         <span class="viewer-name">{{ current?.name }}</span>
@@ -62,7 +62,6 @@
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, PropType, ref, watch } from 'vue'
-import type { ProcessorType } from '@opencloud-eu/web-pkg'
 import { usePhotoLibrary, Photo } from '../composables/usePhotoLibrary'
 import AlbumPicker from './AlbumPicker.vue'
 import PhotoDetailsPanel from './PhotoDetailsPanel.vue'
@@ -74,7 +73,7 @@ export default defineComponent({
     photos: { type: Array as PropType<Photo[]>, required: true },
     index: { type: Number, required: true },
     ensurePreview: {
-      type: Function as PropType<(p: Photo, size?: number, processor?: ProcessorType) => Promise<string>>,
+      type: Function as PropType<(p: Photo, size?: number) => Promise<string>>,
       required: true
     },
     ensureOriginal: {
