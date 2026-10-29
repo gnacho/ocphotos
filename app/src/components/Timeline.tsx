@@ -34,7 +34,7 @@ function DaySection({ day }: { day: DayBucket }) {
   const { openViewer } = useStore()
   return (
     <section style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 400px' }}>
-      <h3 className="sticky top-0 z-10 -mx-1 bg-app px-1 pb-2 pt-4 text-[13px] font-medium capitalize text-main backdrop-blur">
+      <h3 className="sticky top-0 z-10 -mx-1 bg-app px-1 pb-2 pt-4 text-[13px] font-medium first-letter:uppercase text-main backdrop-blur">
         {fmtDay.format(day.date)}
         <span className="ml-2 text-faint">{day.assets.length}</span>
       </h3>

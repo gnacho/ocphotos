@@ -83,6 +83,8 @@ describe('Timeline', () => {
     const heading = container.querySelector('h3')
     expect(heading?.textContent).toContain('15 de junio de 2024')
     expect(heading?.textContent).toContain('2')
+    expect(heading?.className).toContain('first-letter:uppercase')
+    expect(heading?.className).not.toContain('capitalize')
   })
 
   it('cuenta los elementos cargados', () => {
