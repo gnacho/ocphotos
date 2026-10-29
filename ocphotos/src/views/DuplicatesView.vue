@@ -3,7 +3,7 @@
     <div class="dup-toolbar">
       <h1 v-text="$gettext('Duplicates')" />
       <span class="dup-count" v-text="groupsLabel" />
-      <button class="dup-btn" @click="scan" :disabled="loading" v-text="$gettext('Scan')" />
+      <button class="dup-btn" :disabled="loading" @click="scan" v-text="$gettext('Scan')" />
       <span v-if="pending > 0" class="dup-pending" v-text="$gettext('%{n} pending', { n: pending })" />
     </div>
 

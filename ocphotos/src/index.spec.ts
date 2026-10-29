@@ -14,7 +14,7 @@ vi.mock('vue3-gettext', () => ({
 
 const load = async () => {
   const app = (await import('./index')).default as unknown as {
-    setup: (args: unknown) => {
+    setup: () => {
       appInfo: { id: string, name: string, icon: string, extensions: Array<{ mimeType: string, routeName: string }> }
       routes: Array<{ path: string, name?: string, redirect?: string, meta?: Record<string, unknown> }>
       navItems: Array<{ name: string, route: { path: string }, priority: number }>
@@ -22,7 +22,7 @@ const load = async () => {
       extensions: { value: Array<Record<string, unknown>> }
     }
   }
-  return app.setup({ applicationConfig: {} })
+  return app.setup()
 }
 
 describe('extension registration', () => {
