@@ -156,10 +156,10 @@ npm run lint
 npm run test:coverage
 ```
 
-The app suite runs on jsdom and measures only the files that hold logic
-(`src/lib/opencloud.ts`, `src/lib/store.tsx`, `src/lib/groupByDay.ts` and
-`src/hooks/useStore.ts`). Its thresholds live in `app/vitest.config.ts`. The
-shadcn components under `src/components/ui/` are vendored and excluded.
+The app suite runs on jsdom and covers the app's own code: the API client, the
+store, the day grouping and every component under `src/components/`. Its
+thresholds live in `app/vitest.config.ts`. The shadcn components under
+`src/components/ui/`, the demo data and the types stay out of the measure.
 
 ### Continuous integration
 

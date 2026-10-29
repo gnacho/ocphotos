@@ -2,7 +2,11 @@ import path from 'path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
+// Código propio de la app. Queda fuera src/components/ui/** (shadcn vendorizado),
+// src/lib/demoData.ts (datos de ejemplo) y los tipos.
 const LOGIC = [
+  'src/App.tsx',
+  'src/components/*.tsx',
   'src/lib/opencloud.ts',
   'src/lib/store.tsx',
   'src/lib/groupByDay.ts',
@@ -23,11 +27,12 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       include: LOGIC,
+      exclude: ['src/**/*.spec.{ts,tsx}'],
       thresholds: {
-        statements: 92,
-        branches: 78,
-        functions: 92,
-        lines: 95,
+        statements: 97,
+        branches: 90,
+        functions: 97,
+        lines: 99,
       },
     },
   },

@@ -73,10 +73,10 @@ npm run lint
 npm run test:coverage
 ```
 
-La suite de la app corre sobre jsdom y mide solo los ficheros con lógica
-(`src/lib/opencloud.ts`, `src/lib/store.tsx`, `src/lib/groupByDay.ts` y
-`src/hooks/useStore.ts`). Sus umbrales están en `app/vitest.config.ts`. Los
-componentes de shadcn en `src/components/ui/` son vendorizados y quedan fuera.
+La suite de la app corre sobre jsdom y cubre el código propio: el cliente de la
+API, el store, la agrupación por día y todos los componentes de `src/components/`.
+Sus umbrales están en `app/vitest.config.ts`. Los componentes de shadcn en
+`src/components/ui/`, los datos de ejemplo y los tipos quedan fuera de la medida.
 
 ### Integración continua
 
