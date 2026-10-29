@@ -193,7 +193,7 @@ export default defineComponent({
 .viewer {
   /* por encima de los panes de Leaflet (400-1000) y de los modales */
   position: fixed; inset: 0; z-index: var(--z-index-modal, 9999); display: flex; flex-direction: column;
-  background: rgba(0, 0, 0, 0.96);
+  background: #000;
 }
 .viewer-top {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
