@@ -50,11 +50,11 @@ session bearer and the service validates it against OpenCloud's Graph `/me`.
 ## Standalone variant (`app/`)
 
 - **React 19** + **TypeScript 5.9** + **Vite 8** + **Tailwind CSS 4**.
-- Tooling: **Vitest 4** + **jsdom** + **Testing Library**. `npm run test` and
-  `npm run test:coverage` cover the files that hold logic (`src/lib/opencloud.ts`,
-  `src/lib/store.tsx`, `src/lib/groupByDay.ts`, `src/hooks/useStore.ts`), with
-  thresholds in `vitest.config.ts`. The vendored shadcn components under
-  `src/components/ui/` are excluded from the measure.
+- Tooling: **Vitest 5** + **jsdom** + **Testing Library**. `npm run test` and
+  `npm run test:coverage` cover the app's own code (the API client, the store, the
+  day grouping and every component under `src/components/`), with thresholds in
+  `vitest.config.ts`. The vendored shadcn components under `src/components/ui/`,
+  the demo data and the types are excluded from the measure.
 - **Radix UI** primitives (`@radix-ui/react-*`) with class-variance-authority,
   tailwind-merge, clsx, cmdk, vaul, sonner, next-themes.
 - **react-router 7**, **react-hook-form 7** + **zod 4** + `@hookform/resolvers`,
