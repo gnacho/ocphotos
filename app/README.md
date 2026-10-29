@@ -76,13 +76,16 @@ autodetección de la app sólo mira si la respuesta es correcta, así que daría
 bueno un servicio que no está y fallaría al leer el JSON. En un host propio no
 ocurre porque `/api/` sólo existe si el proxy lo pone.
 
-## Límite conocido en modo servicio
+## Miniaturas en modo servicio
 
-Las miniaturas y los originales no se pintan: la API acepta el token únicamente
-en la cabecera `Authorization` y una etiqueta `<img>` no puede enviarla. El modo
-demo y el modo OpenCloud directo no se ven afectados porque usan el app token de
-OpenCloud, que sí viaja en la URL. Está registrado con las mediciones en el issue
-[#102](https://github.com/gnacho/ocphotos/issues/102).
+La API acepta el token únicamente en la cabecera `Authorization`, y una etiqueta
+`<img>` no puede enviarla. Por eso el modo servicio no pone el token en la URL: el
+componente `AssetImage` pide la imagen con `fetch` y la cabecera, y pinta el
+`blob:` que devuelve. `src/lib/images.ts` cachea una descarga por URL y comparte
+la petición si dos vistas piden la misma foto, y `disconnect` libera los blobs.
+
+El modo demo y el modo OpenCloud directo no pasan por ahí porque usan el app token
+de OpenCloud, que sí viaja en la URL.
 
 ## Comprobación tras desplegar
 

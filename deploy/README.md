@@ -189,6 +189,8 @@ reach the service: it falls through to the SPA fallback and returns a 200 with
 OpenCloud's `index.html`. The app only checks whether the response is ok, so it would
 take that for a live service and then fail reading JSON.
 
-In service mode the timeline, memories, favorites and map still render without
-thumbnails, because the API only accepts the token in a header and an `<img>` tag
-cannot send it. Demo mode and direct OpenCloud access are not affected.
+In service mode the token is never put in a URL: the app requests every thumbnail
+and original with the `Authorization` header and paints the resulting `blob:`, so the
+timeline, memories, favorites and map show real images. Demo mode and direct
+OpenCloud access keep using the OpenCloud app token in the URL, which those
+endpoints do accept.
