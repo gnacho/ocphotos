@@ -30,7 +30,8 @@ ocphotos:
 ```
 
 OpenCloud rebuilds the `external_apps` list in `config.json` at startup, so a
-restart is required after registering the app or changing `apps.yaml`:
+restart is required after registering the app, after changing `apps.yaml` and
+after every deploy that replaces the bundle:
 
 ```bash
 rm -rf /etc/opencloud/web/assets/apps/ocphotos
@@ -88,8 +89,16 @@ artefact, so install the released zip instead of a local build:
    ```
 
 The manifest is a static file, so it reports the new version as soon as the files
-are in place. The restart is what rebuilds `external_apps` in `config.json`, which
-matters when the app is registered for the first time or when `apps.yaml` changed.
+are in place. That does not make the restart optional. The remote entry filename
+carries a build hash, so `config.json` keeps pointing at the previous file until
+OpenCloud restarts, and the browser fails with a 404 on that file and
+`failed to load external application ocphotos`. The app stays blank until the
+service is restarted. After it, confirm the entry points at the name the new
+manifest declares:
+
+```bash
+curl -s http://127.0.0.1:9200/config.json | jq '.external_apps[] | select(.id=="ocphotos")'
+```
 
 After the deploy, check the browser: the timeline lists photos with thumbnails,
 the viewer opens one with its EXIF caption, and "Open with" from the Files context
