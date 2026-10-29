@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarClock, FolderOpen, Heart, Sparkles, Users } from 'lucide-react'
 import { useStore } from '@/hooks/useStore'
+import { AssetImage } from '@/components/AssetImage'
 import type { ApiAsset, PhotoAsset } from '@/lib/types'
 
 function Grid({ assets, empty }: { assets: PhotoAsset[]; empty: string }) {
@@ -11,7 +12,7 @@ function Grid({ assets, empty }: { assets: PhotoAsset[]; empty: string }) {
     <div className="grid grid-cols-3 gap-[3px] p-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
       {assets.map((a, i) => (
         <button key={a.id} onClick={() => openViewer(assets, i)} className="group relative aspect-square overflow-hidden bg-raised">
-          <img src={a.thumbUrl} loading="lazy" alt={a.filename} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+          <AssetImage src={a.thumbUrl} loading="lazy" alt={a.filename} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
         </button>
       ))}
     </div>
@@ -36,8 +37,8 @@ export function Recuerdos() {
       .then((j: { assets?: ApiAsset[] }) => setSvcAssets((j.assets ?? []).map((a) => ({
         id: String(a.id), path: a.path, filename: a.filename,
         takenAt: new Date(a.takenAt * 1000), width: a.width || 1600, height: a.height || 1200,
-        thumbUrl: `/api/assets/${a.id}/thumb?w=400${serviceToken ? `?token=${encodeURIComponent(serviceToken)}` : ''}`,
-        fullUrl: `/api/assets/${a.id}/original${serviceToken ? `?token=${encodeURIComponent(serviceToken)}` : ''}`,
+        thumbUrl: `/api/assets/${a.id}/thumb?w=400`,
+        fullUrl: `/api/assets/${a.id}/original`,
         isVideo: a.mediaType === 'video', personIds: [], favorite: a.favorite ?? false,
       }))))
       .catch(() => setSvcAssets([]))
@@ -78,7 +79,7 @@ export function Recuerdos() {
               onClick={() => openViewer(list, 0)}
               className="group relative mb-3 block h-52 w-full overflow-hidden rounded-xl"
             >
-              <img src={list[0].fullUrl} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <AssetImage src={list[0].fullUrl} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
               <div className="absolute bottom-4 left-4 text-left">
                 <p className="text-2xl font-semibold text-white">Hace {years} {years === 1 ? 'año' : 'años'}</p>
@@ -88,7 +89,7 @@ export function Recuerdos() {
             <div className="grid grid-cols-4 gap-[3px] md:grid-cols-8">
               {list.slice(1, 9).map((a, i) => (
                 <button key={a.id} onClick={() => openViewer(list, i + 1)} className="aspect-square overflow-hidden rounded-md bg-raised">
-                  <img src={a.thumbUrl} loading="lazy" alt="" className="h-full w-full object-cover" />
+                  <AssetImage src={a.thumbUrl} loading="lazy" alt="" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
@@ -151,7 +152,7 @@ export function Albums() {
         return (
           <button key={al.id} onClick={() => openViewer(list, 0)} className="group text-left">
             <div className="relative mb-2 aspect-square overflow-hidden rounded-xl bg-raised">
-              <img src={list[0].thumbUrl} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <AssetImage src={list[0].thumbUrl} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
               <div className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 text-xs text-white">{list.length}</div>
             </div>
             <p className="font-medium text-main">{al.name}</p>
@@ -180,7 +181,7 @@ export function Carpetas() {
       {folders.map(([dir, list]) => (
         <button key={dir} onClick={() => openViewer(list, 0)} className="group text-left">
           <div className="relative mb-2 aspect-[4/3] overflow-hidden rounded-xl bg-raised">
-            <img src={list[0].thumbUrl} alt="" className="h-full w-full object-cover opacity-80 transition-transform duration-500 group-hover:scale-105" />
+            <AssetImage src={list[0].thumbUrl} alt="" className="h-full w-full object-cover opacity-80 transition-transform duration-500 group-hover:scale-105" />
             <FolderOpen size={22} className="absolute bottom-2 left-2 text-white drop-shadow" />
           </div>
           <p className="truncate font-medium text-main">{dir.replace(/^\//, '')}</p>

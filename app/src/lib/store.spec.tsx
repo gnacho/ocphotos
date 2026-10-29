@@ -205,8 +205,8 @@ describe('store in service mode', () => {
     const first = result.current.assets[0]
     expect(first.id).toBe('1')
     expect(first.takenAt.toISOString()).toBe(new Date(1722796200 * 1000).toISOString())
-    expect(first.thumbUrl).toBe('/api/assets/1/thumb?w=400&token=tok-123')
-    expect(first.fullUrl).toBe('/api/assets/1/original?token=tok-123')
+    expect(first.thumbUrl).toBe('/api/assets/1/thumb?w=400')
+    expect(first.fullUrl).toBe('/api/assets/1/original')
     expect(result.current.assets[1].isVideo).toBe(true)
 
     const statsCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/stats')

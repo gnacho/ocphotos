@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useStore } from '@/hooks/useStore'
+import { loadImageUrl } from '@/lib/images'
 import type { ApiAsset, PhotoAsset } from '@/lib/types'
 
 export default function MapView() {
@@ -33,24 +34,34 @@ export default function MapView() {
   useEffect(() => {
     const layer = layerRef.current
     if (!layer) return
+    let alive = true
     layer.clearLayers()
     const withGps = geoAssets.filter((a) => a.lat !== undefined && a.lon !== undefined)
     const bounds: L.LatLngExpression[] = []
-    for (const a of withGps.slice(0, 600)) {
-      const icon = L.divIcon({
-        className: '',
-        html: `<img src="${a.thumbUrl}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,.5)" />`,
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
-      })
-      const marker = L.marker([a.lat!, a.lon!], { icon })
-      marker.on('click', () => openViewer(withGps, withGps.indexOf(a)))
-      marker.bindTooltip(a.place ?? a.filename, { direction: 'top' })
-      layer.addLayer(marker)
-      bounds.push([a.lat!, a.lon!])
+    void (async () => {
+      for (const a of withGps.slice(0, 600)) {
+        // Leaflet pinta el icono como HTML, sin cabeceras, así que la miniatura
+        // se descarga con el bearer antes de crear el marcador.
+        const thumb = await loadImageUrl(a.thumbUrl, serviceToken)
+        if (!alive) return
+        const icon = L.divIcon({
+          className: '',
+          html: `<img src="${thumb}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,.5)" />`,
+          iconSize: [48, 48],
+          iconAnchor: [24, 24],
+        })
+        const marker = L.marker([a.lat!, a.lon!], { icon })
+        marker.on('click', () => openViewer(withGps, withGps.indexOf(a)))
+        marker.bindTooltip(a.place ?? a.filename, { direction: 'top' })
+        layer.addLayer(marker)
+        bounds.push([a.lat!, a.lon!])
+      }
+      if (alive && bounds.length > 1 && mapRef.current) mapRef.current.fitBounds(L.latLngBounds(bounds).pad(0.15))
+    })()
+    return () => {
+      alive = false
     }
-    if (bounds.length > 1 && mapRef.current) mapRef.current.fitBounds(L.latLngBounds(bounds).pad(0.15))
-  }, [geoAssets, openViewer])
+  }, [geoAssets, openViewer, serviceToken])
 
   return (
     <div className="flex h-full flex-col">
@@ -90,8 +101,8 @@ function useGeoAssets(mode: string, token: string, fallback: PhotoAsset[]) {
       takenAt: new Date(a.takenAt * 1000),
       width: a.width || 1600,
       height: a.height || 1200,
-      thumbUrl: `/api/assets/${a.id}/thumb?w=100${token ? `?token=${encodeURIComponent(token)}` : ''}`,
-      fullUrl: `/api/assets/${a.id}/original${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+      thumbUrl: `/api/assets/${a.id}/thumb?w=100`,
+      fullUrl: `/api/assets/${a.id}/original`,
       personIds: [],
       isVideo: a.mediaType === 'video',
       favorite: a.favorite ?? false,
