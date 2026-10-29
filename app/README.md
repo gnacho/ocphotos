@@ -76,6 +76,10 @@ autodetección de la app sólo mira si la respuesta es correcta, así que daría
 bueno un servicio que no está y fallaría al leer el JSON. En un host propio no
 ocurre porque `/api/` sólo existe si el proxy lo pone.
 
+Hay una instancia publicada en <https://memories.domatix.cloud>, servida por Nginx
+Proxy Manager con certificado de Let's Encrypt y con `/api/` apuntando al mismo
+servicio que usa la extensión nativa.
+
 ## Miniaturas en modo servicio
 
 La API acepta el token únicamente en la cabecera `Authorization`, y una etiqueta

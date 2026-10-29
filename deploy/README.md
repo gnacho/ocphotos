@@ -194,3 +194,8 @@ and original with the `Authorization` header and paints the resulting `blob:`, s
 timeline, memories, favorites and map show real images. Demo mode and direct
 OpenCloud access keep using the OpenCloud app token in the URL, which those
 endpoints do accept.
+
+A working instance is published at <https://memories.domatix.cloud>. Nginx Proxy
+Manager terminates TLS with a Let's Encrypt certificate and its `location /`
+forwards to the container that serves `dist/`, whose `/api/` proxy points at the
+same service the native extension uses.
