@@ -57,11 +57,13 @@ session bearer and the service validates it against OpenCloud's Graph `/me`.
   the demo data and the types are excluded from the measure.
 - **Radix UI** primitives (`@radix-ui/react-*`) with class-variance-authority,
   tailwind-merge, clsx, cmdk, vaul, sonner, next-themes.
-- **react-router 7**, **react-hook-form 7** + **zod 4** + `@hookform/resolvers`,
-  **recharts 2**, **date-fns 4**, **embla-carousel-react**, **leaflet 1.9**,
-  **lucide-react 0.x**.
-- Backend: **Go 1.26.4**, same storage/EXIF/thumbnail approach as ocapps but
-  single-tenant, plus a PWA served by the same binary (SPA fallback).
+- **react-router 8**, **react-hook-form 7** + **zod 4** + `@hookform/resolvers`,
+  **recharts 3**, **date-fns 4**, **embla-carousel-react 8**, **leaflet 1.9**,
+  **lucide-react 1.61**.
+- Backend: none in this repo. The app talks either to the `photos` module of
+  `ocapps` under `/ocphotos-api/` or to OpenCloud directly over WebDAV and Graph.
+  The same-origin API client needs a proxy from `/api/` to the service, and the direct
+  mode needs CORS on the OpenCloud side. `app/README.md` documents all of it.
 
 ## Dependency update status (checked 2026-10-28)
 

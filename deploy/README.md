@@ -119,6 +119,9 @@ Do not add a reverse-proxy `location` for `/ocphotos`: the proxy must forward
 everything to the OpenCloud web service, which resolves the app route. A static
 PWA location would shadow the native app route, so keep it out of the vhost.
 
+The standalone app is a different deployment with its own host, described in
+section 4.
+
 The app registers itself in the app switcher as `app.ocphotos.menuItem`.
 
 ## Notes
@@ -160,3 +163,32 @@ What matters from here:
 If the host still has the old `photos-service` unit (`/usr/local/bin/photos-service`,
 port `:8097`), that is the September binary and nothing updates it. Point the proxy at
 ocapps and remove the unit, otherwise two indexes drift apart.
+
+## 4. Standalone app (PWA)
+
+`app/` is the standalone variant of the same product: a React SPA that runs outside
+OpenCloud, on its own host or embedded in any page by iframe. It has no backend of its
+own. Build it with `npm ci && npm run build` and serve `dist/`. The app's own
+[README](../app/README.md) covers the three connection modes, the development commands
+and the known limits.
+
+The build uses relative asset paths and declares no client routes, so a plain static
+host is enough and nothing has to be rewritten to `index.html`. It does need a proxy
+from `/api/` to the service, which answers under `/ocphotos-api/api/`:
+
+```
+location /api/ {
+  proxy_pass http://<service>:8096/ocphotos-api/api/;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Serve it on its own host, never from the OpenCloud vhost. There `/api/*` does not
+reach the service: it falls through to the SPA fallback and returns a 200 with
+OpenCloud's `index.html`. The app only checks whether the response is ok, so it would
+take that for a live service and then fail reading JSON.
+
+In service mode the timeline, memories, favorites and map still render without
+thumbnails, because the API only accepts the token in a header and an `<img>` tag
+cannot send it. Demo mode and direct OpenCloud access are not affected.

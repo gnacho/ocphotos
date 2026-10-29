@@ -143,8 +143,8 @@ pnpm test:coverage
 
 The suite runs on Vitest with happy-dom. `pnpm test:coverage` adds a V8 coverage
 report and fails when the totals drop below the thresholds declared in
-`ocphotos/vitest.config.ts`: 85 % statements, 72 % branches, 68 % functions and
-87 % lines overall, with stricter floors for `src/composables/**` and
+`ocphotos/vitest.config.ts`: 95 % statements, 88 % branches, 88 % functions and
+96 % lines overall, with stricter floors for `src/composables/**` and
 `src/components/**`.
 
 ```bash
@@ -160,6 +160,8 @@ The app suite runs on jsdom and covers the app's own code: the API client, the
 store, the day grouping and every component under `src/components/`. Its
 thresholds live in `app/vitest.config.ts`. The shadcn components under
 `src/components/ui/`, the demo data and the types stay out of the measure.
+`app/README.md` covers the three connection modes and how to serve the build,
+and `deploy/README.md` section 4 has the proxy it needs.
 
 ### Continuous integration
 
