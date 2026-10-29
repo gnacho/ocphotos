@@ -97,6 +97,14 @@ describe('Viewer', () => {
     expect(link.getAttribute('download')).toBe('b.jpg')
   })
 
+  it('no capitaliza cada palabra de la fecha', () => {
+    render(<Viewer />)
+    fireEvent.click(screen.getByLabelText('Información'))
+    const date = screen.getByText(/junio de 2024/)
+    expect(date.className).toContain('first-letter:uppercase')
+    expect(date.className).not.toContain('capitalize')
+  })
+
   it('oculta el panel de información hasta que se pide', () => {
     const { container } = render(<Viewer />)
     expect(container.querySelector('aside')).toBeNull()

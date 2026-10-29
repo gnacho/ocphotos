@@ -69,7 +69,7 @@ export default function Viewer() {
       {showInfo && (
         <aside className="absolute right-0 top-14 h-[calc(100%-3.5rem)] w-80 overflow-y-auto border-l border-neutral-800 bg-neutral-950 p-5 text-sm text-neutral-300">
           <h4 className="mb-1 font-medium text-white">{asset.filename}</h4>
-          <p className="mb-4 text-xs capitalize text-neutral-500">
+          <p className="mb-4 text-xs first-letter:uppercase text-neutral-500">
             {new Intl.DateTimeFormat('es', { dateStyle: 'full', timeStyle: 'short' }).format(asset.takenAt)}
           </p>
           {asset.place && (

@@ -305,9 +305,10 @@ export default defineComponent({
 }
 .photos-day-header {
   position: sticky; top: 36px; z-index: 1; margin: 0; padding: 6px 0;
-  font-size: 0.8rem; font-weight: 500; text-transform: capitalize;
+  font-size: 0.8rem; font-weight: 500; text-transform: none;
   background: var(--oc-role-surface, #fff);
 }
+.photos-day-header::first-letter { text-transform: uppercase; }
 .photos-day-header span { color: var(--oc-role-on-surface-variant, #40484c); margin-left: 0.5em; }
 .photos-rows { display: flex; flex-direction: column; gap: 3px; padding-bottom: 6px; }
 .photos-row { display: flex; gap: 3px; }
