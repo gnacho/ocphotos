@@ -236,7 +236,7 @@ Esas limitaciones describen la etapa 1. La extensión de hoy toma los datos del 
 
 ---
 
-## 13. Estado a 28 de octubre de 2026: v1.6.0 en producción
+## 13. Estado a 29 de octubre de 2026: v1.6.1 en producción
 
 Este apartado sustituye a las limitaciones descritas en §12 y corrige la lista de pendientes de §11.
 
@@ -258,7 +258,7 @@ Este apartado sustituye a las limitaciones descritas en §12 y corrige la lista 
 - Dependabot agrupado por ecosistema para menores y parches, con los cambios mayores sueltos, y un guardarraíl que falla si el lockfile deja de fijar los `overrides` de seguridad.
 - Release por tag que genera el zip instalable, más la versión del manifiesto alineada con el tag.
 
-**Producción.** La 1.6.0 está desplegada en `drive.domatix.cloud` (contenedor 4125). Verificado en navegador real: el manifiesto servido declara 1.6.0, el timeline carga las fotos con sus miniaturas, el flujo "abrir con" desde Archivos abre el visor con la foto correcta y su pie EXIF, y un sidecar escrito a mano se refleja en el índice tras pedir un reescaneo.
+**Producción.** La 1.6.1 está desplegada en `drive.domatix.cloud` (contenedor 4125). Verificado en navegador real: el manifiesto servido declara 1.6.1, el timeline carga las fotos con sus miniaturas, el flujo "abrir con" desde Archivos abre el visor con la foto correcta y su pie EXIF, y un sidecar escrito a mano se refleja en el índice tras pedir un reescaneo. La 1.6.1 es un parche sobre la 1.6.0 que hace opaco el fondo del visor a pantalla completa: con el 96 por ciento de opacidad anterior se leía el host por debajo y el pie de la foto se solapaba con su chrome.
 
 **Pendiente real**, revisado contra el código y no contra notas antiguas:
 
