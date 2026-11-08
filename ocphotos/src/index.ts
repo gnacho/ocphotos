@@ -19,7 +19,7 @@ export default defineWebApplication({
       id: 'ocphotos',
       name: $gettext('Photos'),
       icon: 'image-line',
-      color: '#0ea5e9',
+      color: 'var(--oc-role-secondary)',
       // "Abrir con" en Files para imágenes y vídeos. routeName va prefijado con
       // el appId por el host, así que aquí se declara el nombre ya prefijado.
       extensions: [
