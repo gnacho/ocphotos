@@ -52,7 +52,7 @@
       </div>
 
       <!-- Rewind: años + meses -->
-      <aside v-if="railYears.length" class="rewind">
+      <aside v-if="photos.length || railYears.length" class="rewind">
         <button
           class="rewind-item rewind-now"
           :class="{ active: startAt === null }"
