@@ -309,20 +309,41 @@ export function usePhotoLibrary() {
       }))
   })
 
-  /** Miniatura del backend (decodifica HEIC/HEIF). Devuelve un blob URL. */
-  const ensurePreview = async (p: Photo, size = 400): Promise<string> => {
+  const inFlight = new Map<string, Promise<string>>()
+
+  /**
+   * Miniatura del backend (decodifica HEIC/HEIF). Devuelve un blob URL.
+   *
+   * Deduplica: la misma foto se pide desde el timeline y desde la tira de
+   * "hace X años", y antes se lanzaban dos peticiones idénticas. Reintenta una
+   * vez: en servidores cargados la primera puede cortarse, y el error se
+   * tragaba dejando el hueco vacío hasta que algo forzaba la carga.
+   */
+  const ensurePreview = (p: Photo, size = 400): Promise<string> => {
     const key = `${p.id}|${size}`
-    if (previews.value[key]) return previews.value[key]
-    try {
-      const res = await api(`/api/assets/${p.id}/thumb?w=${size}`)
-      const blob = await res.blob()
-      if (!blob.size) return ''
-      const url = URL.createObjectURL(blob)
-      previews.value[key] = url
-      return url
-    } catch {
+    if (previews.value[key]) return Promise.resolve(previews.value[key])
+    const pending = inFlight.get(key)
+    if (pending) return pending
+
+    const load = async (): Promise<string> => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await api(`/api/assets/${p.id}/thumb?w=${size}`)
+          const blob = await res.blob()
+          if (!blob.size) return ''
+          const url = URL.createObjectURL(blob)
+          previews.value[key] = url
+          return url
+        } catch {
+          if (attempt === 0) await new Promise((r) => setTimeout(r, 1200))
+        }
+      }
       return ''
     }
+
+    const promise = load().finally(() => inFlight.delete(key))
+    inFlight.set(key, promise)
+    return promise
   }
 
   /** URL firmada de streaming progresivo para un vídeo (Range, mismo origen). */
