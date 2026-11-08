@@ -204,12 +204,25 @@ export function usePhotoLibrary() {
   // --- sincronización automática: recoge fotos subidas a OpenCloud ---
   let lastTotal: number | null = null
   let watching = false
+  let lastScanRequest = 0
 
-  /** Pide un rescan al backend y recarga el timeline si cambió el número de fotos. */
+  /**
+   * El escaneo completo del espacio es caro (miles de PROPFINDs), así que se
+   * pide como mucho cada SCAN_REQUEST_EVERY. Entre medias solo se consulta el
+   * total para refrescar si cambió: pedirlo cada 30 s dejaba el servidor
+   * escaneando sin parar en bibliotecas grandes.
+   */
+  const SCAN_REQUEST_EVERY = 10 * 60 * 1000
+
+  /** Pide un rescan al backend (con límite de frecuencia) y recarga el timeline si cambió el número de fotos. */
   const syncNow = async (triggerScan = true) => {
     if (state.loading.value) return
     try {
-      if (triggerScan) await api('/api/admin/rescan', { method: 'POST' })
+      const now = Date.now()
+      if (triggerScan && now - lastScanRequest >= SCAN_REQUEST_EVERY) {
+        lastScanRequest = now
+        await api('/api/admin/rescan', { method: 'POST' })
+      }
       const res = await api('/api/stats')
       const st = (await res.json()) as { assets?: number }
       const total = st.assets ?? 0

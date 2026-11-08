@@ -467,9 +467,12 @@ describe('usePhotoLibrary API client', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(fetchMock).toHaveBeenCalledTimes(2)
 
+    // 30 s después solo se consulta el total: el escaneo va limitado a una
+    // petición cada SCAN_REQUEST_EVERY porque recorrer el espacio es caro.
     fetchMock.mockClear()
     await vi.advanceTimersByTimeAsync(30000)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(urls()[0]).toBe('/ocphotos-api/api/stats')
 
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
     fetchMock.mockClear()
