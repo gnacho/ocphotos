@@ -18,7 +18,7 @@ export default defineWebApplication({
     const appInfo = {
       id: 'ocphotos',
       name: $gettext('Photos'),
-      icon: 'image-line',
+      icon: 'image',
       color: 'var(--oc-role-secondary)',
       // "Abrir con" en Files para imágenes y vídeos. routeName va prefijado con
       // el appId por el host, así que aquí se declara el nombre ya prefijado.
@@ -156,67 +156,67 @@ export default defineWebApplication({
     const navItems: AppNavigationItem[] = [
       {
         name: $gettext('Photos'),
-        icon: 'image-line',
+        icon: 'image',
         route: { path: `/${appInfo.id}/timeline` },
         priority: 10
       },
       {
         name: $gettext('On this day'),
-        icon: 'calendar-line',
+        icon: 'calendar',
         route: { path: `/${appInfo.id}/memories` },
         priority: 20
       },
       {
         name: $gettext('Explore'),
-        icon: 'apps-2-line',
+        icon: 'apps-2',
         route: { path: `/${appInfo.id}/explore` },
         priority: 30
       },
       {
         name: $gettext('Albums'),
-        icon: 'album-line',
+        icon: 'album',
         route: { path: `/${appInfo.id}/albums` },
         priority: 35
       },
       {
         name: $gettext('Places'),
-        icon: 'map-pin-line',
+        icon: 'map-pin',
         route: { path: `/${appInfo.id}/places` },
         priority: 40
       },
       {
         name: $gettext('Tags'),
-        icon: 'price-tag-3-line',
+        icon: 'price-tag-3',
         route: { path: `/${appInfo.id}/tags` },
         priority: 42
       },
       {
         name: $gettext('Duplicates'),
-        icon: 'file-copy-2-line',
+        icon: 'file-copy-2',
         route: { path: `/${appInfo.id}/duplicates` },
         priority: 43
       },
       {
         name: $gettext('Archive'),
-        icon: 'archive-2-line',
+        icon: 'archive-2',
         route: { path: `/${appInfo.id}/archive` },
         priority: 47
       },
       {
         name: $gettext('Folders'),
-        icon: 'folder-line',
+        icon: 'folder',
         route: { path: `/${appInfo.id}/folders` },
         priority: 44
       },
       {
         name: $gettext('Map'),
-        icon: 'map-2-line',
+        icon: 'map-2',
         route: { path: `/${appInfo.id}/map` },
         priority: 45
       },
       {
         name: $gettext('Favorites'),
-        icon: 'heart-line',
+        icon: 'heart',
         route: { path: `/${appInfo.id}/favorites` },
         priority: 50
       }

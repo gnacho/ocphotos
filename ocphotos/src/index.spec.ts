@@ -31,7 +31,7 @@ describe('extension registration', () => {
 
     expect(appInfo.id).toBe('ocphotos')
     expect(appInfo.name).toBe('Photos')
-    expect(appInfo.icon).toBe('image-line')
+    expect(appInfo.icon).toBe('image')
   })
 
   // the host mounts app routes as `<appId>-<route name>`, so the open-with
