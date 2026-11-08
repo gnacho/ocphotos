@@ -52,14 +52,14 @@
       </div>
 
       <!-- Rewind: años + meses -->
-      <aside v-if="years.length" class="rewind">
+      <aside v-if="railYears.length" class="rewind">
         <button
           class="rewind-item rewind-now"
           :class="{ active: startAt === null }"
           :title="$gettext('Now')"
           @click="jumpTo(null)"
         >•</button>
-        <template v-for="y in years" :key="y.year">
+        <template v-for="y in railYears" :key="y.year">
           <button
             class="rewind-item"
             :class="{ active: openYear === y.year || topYear === y.year }"
@@ -125,6 +125,32 @@ export default defineComponent({
     const scrollEl = ref<HTMLElement | null>(null)
     const containerW = ref(0)
     const years = ref<CalendarYear[]>([])
+    /**
+     * Años del rail. Prefiere el calendario completo del API; si esa llamada
+     * falla o tarda, se deriva de las fotos ya cargadas para que la línea
+     * temporal no desaparezca sin explicación.
+     */
+    const railYears = computed<CalendarYear[]>(() => {
+      if (years.value.length) return years.value
+      const byYear = new Map<number, Map<number, number>>()
+      for (const p of photos.value) {
+        const d = new Date(p.takenAt * 1000)
+        const y = d.getFullYear()
+        const m = d.getMonth() + 1
+        if (!byYear.has(y)) byYear.set(y, new Map())
+        const months = byYear.get(y)!
+        months.set(m, (months.get(m) ?? 0) + 1)
+      }
+      return [...byYear.entries()]
+        .sort((a, b) => b[0] - a[0])
+        .map(([year, months]) => ({
+          year,
+          count: [...months.values()].reduce((a, b) => a + b, 0),
+          months: [...months.entries()]
+            .sort((a, b) => b[0] - a[0])
+            .map(([month, count]) => ({ month, count }))
+        }))
+    })
     const openYear = ref<number | null>(null)
 
     const otdPhotos = ref<Photo[]>([])
@@ -259,7 +285,7 @@ export default defineComponent({
     onBeforeUnmount(() => ro?.disconnect())
 
     return {
-      photos, loading, error, months, years, topYear, startAt, sentinel, scrollEl, onThisDay, otdTitle, jumpToPhoto, albumFor, countLabel,
+      photos, loading, error, months, years, railYears, topYear, startAt, sentinel, scrollEl, onThisDay, otdTitle, jumpToPhoto, albumFor, countLabel,
       viewerList, viewerIndex, openViewer, formatDay, monthName, onImgError, jumpTo, jumpToYear, jumpToMonth, toggleYear, openYear, dayRows,
       rescan, thumbSrc, ensurePreview, ensureOriginal
     }

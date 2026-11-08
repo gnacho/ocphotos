@@ -384,8 +384,19 @@ describe('TimelineView', () => {
     await flush()
 
     expect(wrapper.findAll('.photos-item')).toHaveLength(1)
-    expect(wrapper.find('.rewind').exists()).toBe(false)
+    // Sin calendario del API el rail se deriva de las fotos ya cargadas: la
+    // línea temporal no debe desaparecer por un fallo de red.
+    expect(wrapper.find('.rewind').exists()).toBe(true)
+    expect(wrapper.findAll('.rewind-item').some((b) => b.text() === '2024')).toBe(true)
     expect(wrapper.find('.otd-block').exists()).toBe(false)
+  })
+
+  it('hides the rewind when there is nothing to scrub', async () => {
+    const lib = makeLib({ photos: [], months: [], calendarFails: true, highlightsFail: true })
+    const wrapper = mountView(lib)
+    await flush()
+
+    expect(wrapper.find('.rewind').exists()).toBe(false)
   })
 
   it('triggers a rescan from the toolbar', async () => {
