@@ -308,7 +308,20 @@ export default defineComponent({
 }
 .photos-empty p { margin: 0; }
 .photos-body { flex: 1; min-height: 0; display: flex; }
-.photos-scroll { flex: 1; overflow-y: auto; padding: 0 8px; }
+.photos-scroll { flex: 1; overflow-y: auto; padding: 0 8px; scrollbar-gutter: stable; }
+/* Barra de desplazamiento visible: el host usa barras superpuestas que solo
+   aparecen al hacer scroll, y en una biblioteca grande parece que la vista no
+   tiene scroll. */
+.photos-scroll { scrollbar-width: thin; scrollbar-color: var(--oc-role-outline-variant, #bfc8cc) transparent; }
+.photos-scroll::-webkit-scrollbar { width: 10px; }
+.photos-scroll::-webkit-scrollbar-track { background: transparent; }
+.photos-scroll::-webkit-scrollbar-thumb {
+  background: var(--oc-role-outline-variant, #bfc8cc);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.photos-scroll::-webkit-scrollbar-thumb:hover { background: var(--oc-role-outline, #70787c); background-clip: content-box; }
 
 /* On this day */
 .otd-block { padding: 8px 4px 4px; }
