@@ -139,14 +139,31 @@ const originals = ref<Record<string, string>>({})
 export function usePhotoLibrary() {
   const authStore = useAuthStore()
 
+  /**
+   * Petición a la API con límite de tiempo. Sin él, una petición colgada deja
+   * la vista en "Cargando…" para siempre: sin rejilla, sin scroll y sin ningún
+   * error que lo explique.
+   */
   const api = async (path: string, init?: RequestInit): Promise<Response> => {
     const token = authStore.accessToken
-    const res = await fetch(`${SERVICE_BASE}${path}`, {
-      ...init,
-      headers: { ...(init?.headers as Record<string, string> | undefined), Authorization: `Bearer ${token}` }
-    })
-    if (!res.ok) throw new Error(`${path} -> ${res.status}`)
-    return res
+    const ctl = new AbortController()
+    const timer = setTimeout(() => ctl.abort(), 20000)
+    try {
+      const res = await fetch(`${SERVICE_BASE}${path}`, {
+        ...init,
+        signal: init?.signal ?? ctl.signal,
+        headers: { ...(init?.headers as Record<string, string> | undefined), Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error(`${path} -> ${res.status}`)
+      return res
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        throw new Error(`${path} -> sin respuesta del servidor (20 s)`)
+      }
+      throw e
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   const loadPage = async (reset = false) => {
