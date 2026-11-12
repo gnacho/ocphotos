@@ -146,6 +146,19 @@ location /ocphotos-api/ {
 }
 ```
 
+## Mobile app (Android)
+
+Photos has a native Android client: [ocphotos-android](https://github.com/gnacho/ocphotos-android)
+(Kotlin + Jetpack Compose, AGPL-3.0). It talks to the same API under `/ocphotos-api`
+served by `ocapps`, so it needs the backend and the proxy route above.
+
+- Download the signed APK from the [latest release](https://github.com/gnacho/ocphotos-android/releases/latest).
+- Log in with the OpenCloud server URL, your user name and an **app token** (the
+  six-word passphrase from OpenCloud, App tokens), not your account password.
+- It reads the photo index built by the backend scanner. If the library looks empty
+  while the web app shows photos, the scanner has nothing indexed for that account
+  yet: check `OCAPPS_PHOTOS_SCAN_ROOT` and trigger a rescan.
+
 ## Development
 
 ```bash
