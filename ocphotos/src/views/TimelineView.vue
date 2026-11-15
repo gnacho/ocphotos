@@ -118,7 +118,8 @@ export default defineComponent({
     const { $gettext } = useGettext()
     const {
       photos, loading, error, months, exhausted, startAt,
-      init, loadMore, jumpTo, fetchCalendar, fetchHighlights, rescan, previews, ensurePreview, ensureOriginal, startWatching
+      init, loadMore, jumpTo, fetchCalendar, fetchHighlights, rescan, previews, ensurePreview, ensureOriginal,
+      startWatching, stopWatching
     } = usePhotoLibrary()
 
     const sentinel = ref<HTMLElement | null>(null)
@@ -282,7 +283,11 @@ export default defineComponent({
       if (sentinel.value) obs.observe(sentinel.value)
     })
 
-    onBeforeUnmount(() => ro?.disconnect())
+    onBeforeUnmount(() => {
+      ro?.disconnect()
+      // Cierra el stream de avisos: al volver a la vista se reabre.
+      stopWatching()
+    })
 
     return {
       photos, loading, error, months, years, railYears, topYear, startAt, sentinel, scrollEl, onThisDay, otdTitle, jumpToPhoto, albumFor, countLabel,
