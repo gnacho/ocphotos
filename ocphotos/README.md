@@ -12,8 +12,12 @@ El índice y las miniaturas los sirve el módulo `photos` de
   sticky y scroll infinito por paginación keyset; miniaturas generadas por el
   backend (incluye **HEIC/HEIF**, que OpenCloud no decodifica).
 - **Rewind**: scrubber de años para saltar a cualquier fecha (`/api/timeline/calendar`).
-- **Auto-sync**: al abrir/enfocar y cada 30 s pide un rescan al backend y recarga el
-  timeline si cambió el número de fotos (las subidas aparecen solas).
+- **Sincronización en vivo**: al abrir la vista pide un rescan (acotado a uno cada
+  10 minutos) y después mantiene abierto el stream de avisos del backend
+  (`/ocphotos-api/api/stream`, SSE): cuando el índice o los metadatos de tus fotos
+  cambian, el servidor avisa y el timeline se recarga solo, sin sondeos ni esperas.
+  Si el stream se corta, se reintenta con backoff y al volver se recarga todo por
+  si se perdió algún aviso. Sin stream la app sigue funcionando (solo sin avisos).
 - **Explore**: hub con buscador por fichero/cámara/ruta y accesos rápidos.
 - **Mapa**: marcadores con **miniatura de la foto** (48x48, badge de recuento en
   los grupos) agrupados por lugar (`/api/places`), sobre OpenStreetMap. Clic en un

@@ -4,6 +4,30 @@ vi.mock('@opencloud-eu/web-pkg', () => ({
   useAuthStore: () => ({ accessToken: 'test-token' })
 }))
 
+// El stream de avisos se sustituye por un doble: aquí se prueba la reacción a
+// sus eventos, no el transporte (useLiveUpdates.spec.ts cubre el transporte).
+const live = vi.hoisted(() => {
+  const state = {
+    started: [] as { path: string; getToken: () => string; onChange: (e: unknown) => void; onReconnect?: () => void }[],
+    stopped: 0
+  }
+  return {
+    state,
+    start: vi.fn((options: (typeof state.started)[number]) => {
+      state.started.push(options)
+      return () => {
+        state.stopped += 1
+      }
+    })
+  }
+})
+
+vi.mock('./useLiveUpdates', () => ({
+  CLIENT_ID: 'this-tab',
+  CLIENT_HEADER: 'X-Ocapps-Client',
+  startLiveUpdates: live.start
+}))
+
 const response = (body: unknown, ok = true, status = 200) =>
   ({ ok, status, json: () => Promise.resolve(body) }) as unknown as Response
 
@@ -44,6 +68,9 @@ describe('usePhotoLibrary API client', () => {
 
   beforeEach(() => {
     vi.resetModules()
+    live.state.started.length = 0
+    live.state.stopped = 0
+    live.start.mockClear()
     fetchMock = vi.fn()
     created = 0
     vi.stubGlobal('fetch', fetchMock)
@@ -409,47 +436,34 @@ describe('usePhotoLibrary API client', () => {
     expect(lib.photos.value).toHaveLength(1)
   })
 
-  it('uses the first sync as a baseline without reloading', async () => {
-    fetchMock.mockResolvedValue(response({ assets: 10 }))
+  it('syncs without a scan when asked, reloading the timeline', async () => {
+    fetchMock.mockResolvedValue(response({ assets: [asset()] }))
     const lib = await load()
 
     await lib.syncNow(false)
 
-    expect(urls()).toEqual(['/ocphotos-api/api/stats'])
-    expect(lib.photos.value).toEqual([])
-  })
-
-  it('reloads the timeline when the asset count changes', async () => {
-    fetchMock.mockResolvedValueOnce(response({ assets: 10 }))
-    fetchMock.mockResolvedValueOnce(response({ assets: 10 }))
-    fetchMock.mockResolvedValueOnce(response({ assets: 11 }))
-    fetchMock.mockResolvedValueOnce(response({ assets: [asset()] }))
-    const lib = await load()
-
-    await lib.syncNow(false)
-    await lib.syncNow(false)
-    expect(lib.photos.value).toEqual([])
-
-    await lib.syncNow(false)
+    expect(urls()).toEqual(['/ocphotos-api/api/assets?limit=300'])
     expect(lib.photos.value).toHaveLength(1)
-    expect(lib.exhausted.value).toBe(true)
   })
 
-  it('triggers a rescan before syncing by default', async () => {
-    fetchMock.mockResolvedValue(response({ assets: 1 }))
+  it('scans before syncing, at most once every ten minutes', async () => {
+    fetchMock.mockResolvedValue(response({ assets: [asset()] }))
     const lib = await load()
 
-    await lib.syncNow()
-
+    await lib.syncNow(true)
     expect(urls()[0]).toBe('/ocphotos-api/api/admin/rescan')
-    expect(urls()[1]).toBe('/ocphotos-api/api/stats')
+
+    fetchMock.mockClear()
+    await lib.syncNow(true)
+    expect(urls()).not.toContain('/ocphotos-api/api/admin/rescan')
   })
 
-  it('skips a sync while a page is loading and swallows failures', async () => {
+  it('skips a sync while a page is loading and swallows scan failures', async () => {
     fetchMock.mockRejectedValueOnce(new Error('offline'))
+    fetchMock.mockResolvedValue(response({ assets: [] }))
     const lib = await load()
 
-    await expect(lib.syncNow(false)).resolves.toBeUndefined()
+    await expect(lib.syncNow(true)).resolves.toBeUndefined()
 
     fetchMock.mockClear()
     lib.loading.value = true
@@ -457,27 +471,94 @@ describe('usePhotoLibrary API client', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('starts the watcher once and only syncs while the tab is visible', async () => {
+  it('starts the watcher once: one scan and one live stream, no polling', async () => {
     vi.useFakeTimers()
-    fetchMock.mockResolvedValue(response({ assets: 3 }))
+    fetchMock.mockResolvedValue(response({ assets: [] }))
     const lib = await load()
 
     lib.startWatching()
     lib.startWatching()
     await vi.advanceTimersByTimeAsync(0)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
 
-    // 30 s después solo se consulta el total: el escaneo va limitado a una
-    // petición cada SCAN_REQUEST_EVERY porque recorrer el espacio es caro.
-    fetchMock.mockClear()
-    await vi.advanceTimersByTimeAsync(30000)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(urls()[0]).toBe('/ocphotos-api/api/stats')
+    expect(live.start).toHaveBeenCalledTimes(1)
+    expect(live.state.started[0].path).toBe('/ocphotos-api/api/stream')
+    expect(urls()).toEqual(['/ocphotos-api/api/admin/rescan', '/ocphotos-api/api/assets?limit=300'])
 
-    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    // Ya no hay temporizador: sin avisos no hay tráfico.
     fetchMock.mockClear()
     await vi.advanceTimersByTimeAsync(30000)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('reloads the timeline when the server announces new photos', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue(response({ assets: [asset()] }))
+    const lib = await load()
+    lib.startWatching()
+    await vi.advanceTimersByTimeAsync(0)
+
+    fetchMock.mockClear()
+    live.state.started[0].onChange({ topic: 'photos', client: 'other-tab' })
+    await vi.advanceTimersByTimeAsync(600)
+
+    expect(urls()).toEqual(['/ocphotos-api/api/assets?limit=300'])
+    expect(lib.photos.value).toHaveLength(1)
+  })
+
+  it('ignores its own events, other topics and event bursts', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue(response({ assets: [] }))
+    const lib = await load()
+    lib.startWatching()
+    await vi.advanceTimersByTimeAsync(0)
+
+    fetchMock.mockClear()
+    live.state.started[0].onChange({ topic: 'photos', client: 'this-tab' })
+    live.state.started[0].onChange({ topic: 'albums' })
+    await vi.advanceTimersByTimeAsync(600)
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    // Varios avisos seguidos en la misma ventana = una sola recarga.
+    live.state.started[0].onChange({ topic: 'photos' })
+    live.state.started[0].onChange({ topic: 'photos' })
+    live.state.started[0].onChange({ topic: 'photos' })
+    await vi.advanceTimersByTimeAsync(600)
+    expect(urls()).toEqual(['/ocphotos-api/api/assets?limit=300'])
+  })
+
+  it('syncs again when the stream comes back after a break', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue(response({ assets: [] }))
+    const lib = await load()
+    lib.startWatching()
+    await vi.advanceTimersByTimeAsync(0)
+
+    fetchMock.mockClear()
+    live.state.started[0].onReconnect?.()
+    await vi.advanceTimersByTimeAsync(0)
+
+    // El rescan va acotado a 10 minutos: aquí solo recarga.
+    expect(urls()).toEqual(['/ocphotos-api/api/assets?limit=300'])
+  })
+
+  it('closes the stream and the pending reload when the view goes away', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue(response({ assets: [] }))
+    const lib = await load()
+    lib.startWatching()
+    await vi.advanceTimersByTimeAsync(0)
+
+    lib.stopWatching()
+    expect(live.state.stopped).toBe(1)
+
+    fetchMock.mockClear()
+    live.state.started[0].onChange({ topic: 'photos' })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    // Y se puede volver a arrancar (al remontar la vista).
+    lib.startWatching()
+    expect(live.start).toHaveBeenCalledTimes(2)
   })
 
   it('loads more only while the timeline is not exhausted', async () => {

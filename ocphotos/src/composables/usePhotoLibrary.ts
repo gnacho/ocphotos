@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { useAuthStore } from '@opencloud-eu/web-pkg'
+import { CLIENT_HEADER, CLIENT_ID, startLiveUpdates } from './useLiveUpdates'
 
 // backend del servicio de fotos (mismo origen). Mantiene el índice (EXIF, geo,
 // favoritos) y sirve miniaturas (incluido HEIC) y originales.
@@ -152,7 +153,13 @@ export function usePhotoLibrary() {
       const res = await fetch(`${SERVICE_BASE}${path}`, {
         ...init,
         signal: init?.signal ?? ctl.signal,
-        headers: { ...(init?.headers as Record<string, string> | undefined), Authorization: `Bearer ${token}` }
+        headers: {
+          ...(init?.headers as Record<string, string> | undefined),
+          Authorization: `Bearer ${token}`,
+          // Identifica a ESTA pestaña: los eventos que provoca se devuelven
+          // marcados y no se recarga lo que ya está en pantalla.
+          [CLIENT_HEADER]: CLIENT_ID
+        }
       })
       if (!res.ok) throw new Error(`${path} -> ${res.status}`)
       return res
@@ -218,56 +225,94 @@ export function usePhotoLibrary() {
     await loadPage(true)
   }
 
-  // --- sincronización automática: recoge fotos subidas a OpenCloud ---
-  let lastTotal: number | null = null
+  // --- sincronización en vivo: recoge fotos subidas a OpenCloud ---
   let watching = false
   let lastScanRequest = 0
+  let stopLive: (() => void) | null = null
+  let reloadTimer: number | null = null
 
   /**
    * El escaneo completo del espacio es caro (miles de PROPFINDs), así que se
-   * pide como mucho cada SCAN_REQUEST_EVERY. Entre medias solo se consulta el
-   * total para refrescar si cambió: pedirlo cada 30 s dejaba el servidor
-   * escaneando sin parar en bibliotecas grandes.
+   * pide como mucho cada SCAN_REQUEST_EVERY. Lo normal es que ni haga falta:
+   * el servidor avisa por el stream cuando el índice cambia.
    */
   const SCAN_REQUEST_EVERY = 10 * 60 * 1000
 
-  /** Pide un rescan al backend (con límite de frecuencia) y recarga el timeline si cambió el número de fotos. */
-  const syncNow = async (triggerScan = true) => {
-    if (state.loading.value) return
+  /** Pide un rescan al backend, con límite de frecuencia. */
+  const requestScan = async () => {
+    const now = Date.now()
+    if (now - lastScanRequest < SCAN_REQUEST_EVERY) return
+    lastScanRequest = now
     try {
-      const now = Date.now()
-      if (triggerScan && now - lastScanRequest >= SCAN_REQUEST_EVERY) {
-        lastScanRequest = now
-        await api('/api/admin/rescan', { method: 'POST' })
-      }
-      const res = await api('/api/stats')
-      const st = (await res.json()) as { assets?: number }
-      const total = st.assets ?? 0
-      if (lastTotal === null) {
-        lastTotal = total
-        return
-      }
-      if (total !== lastTotal) {
-        lastTotal = total
-        state.exhausted.value = false
-        await loadPage(true)
-      }
+      await api('/api/admin/rescan', { method: 'POST' })
     } catch {
-      /* sin conexión con el servicio: se reintenta en el siguiente tick */
+      /* el scan corre en segundo plano: si falla, se reintenta más adelante */
     }
   }
 
-  /** Arranca el watcher: al abrir/enfocar y cada 30 s mientras la pestaña está visible. */
+  /** Recarga el timeline desde el principio. */
+  const reloadLatest = async () => {
+    if (state.loading.value) return
+    state.exhausted.value = false
+    await loadPage(true)
+  }
+
+  /** Varios avisos seguidos = una sola recarga. */
+  const scheduleReload = () => {
+    if (!watching || reloadTimer !== null) return
+    reloadTimer = window.setTimeout(() => {
+      reloadTimer = null
+      void reloadLatest()
+    }, 500)
+  }
+
+  /**
+   * Pide un rescan (opcional) y recarga el timeline. Se usa al abrir la vista y
+   * al recuperar el stream tras un corte, cuando pudieron perderse avisos.
+   */
+  const syncNow = async (triggerScan = true) => {
+    if (state.loading.value) return
+    if (triggerScan) await requestScan()
+    await reloadLatest()
+  }
+
+  /**
+   * Arranca la sincronización en vivo: un rescan al abrir (acotado) y el stream
+   * de avisos del backend. Ya no hay temporizador ni sondeo de `/api/stats`:
+   * sin cambios no hay tráfico.
+   */
   const startWatching = () => {
     if (watching) return
     watching = true
     void syncNow(true)
-    window.setInterval(() => {
-      if (document.visibilityState === 'visible') void syncNow(true)
-    }, 30000)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') void syncNow(true)
+    stopLive = startLiveUpdates({
+      path: `${SERVICE_BASE}/api/stream`,
+      getToken: () => authStore.accessToken,
+      onChange: (event) => {
+        if (event.topic !== 'photos') return
+        if (event.client === CLIENT_ID) return // ya lo tengo en pantalla
+        scheduleReload()
+      },
+      // Tras un corte pudieron perderse avisos: rescan acotado y recarga.
+      onReconnect: () => void syncNow(true)
     })
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  }
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') void syncNow(true)
+  }
+
+  /** Cierra el stream y el temporizador pendiente (al desmontar la vista). */
+  const stopWatching = () => {
+    watching = false
+    stopLive?.()
+    stopLive = null
+    if (reloadTimer !== null) {
+      window.clearTimeout(reloadTimer)
+      reloadTimer = null
+    }
+    document.removeEventListener('visibilitychange', onVisibilityChange)
   }
 
   const fetchCalendar = async (): Promise<CalendarYear[]> => {
@@ -571,6 +616,7 @@ export function usePhotoLibrary() {
     jumpTo,
     fetchCalendar,
     startWatching,
+    stopWatching,
     syncNow,
     rescan,
     ensurePreview,
