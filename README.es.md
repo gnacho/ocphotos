@@ -25,7 +25,7 @@ independiente que habla con OpenCloud por WebDAV/Graph/OIDC, la misma forma que 
 
 ## Estado
 
-La extensión nativa es la que se usa a diario: versión 1.6.1, desplegada en
+La extensión nativa es la que se usa a diario: versión 1.6.3, desplegada en
 `drive.domatix.cloud`. Cubre timeline por días, recuerdos, explorar, álbumes, lugares, archivo,
 duplicados, etiquetas, carpetas, mapa, favoritos y visor a pantalla completa con vídeo y descarga.
 Consume la API del servicio de fotos (`/ocphotos-api/...`), así que los metadatos viven en el
@@ -42,6 +42,18 @@ vuelve a leer los que deje otra herramienta, así que la biblioteca no depende d
 
 La PWA de `app/` sigue disponible como alternativa standalone y embebida, y también funciona
 sola con datos demo.
+
+## Traducciones
+
+Los textos de la interfaz viven en `ocphotos/l10n/translations.json`, un bloque por
+idioma (`es` hoy) con el texto inglés como clave, y el host elige el bloque que
+coincide con su idioma. Lo que falte cae al inglés.
+
+Para añadir un idioma, copia el bloque `es`, traduce los valores y deja las claves
+intactas. Los marcadores `%{n}` y `%{month}` se quedan como están. Un test unitario
+(`ocphotos/src/l10n.spec.ts`) falla si un bloque pierde una clave, trae una que la
+referencia no tiene, se come un marcador o deja un valor vacío, así que la
+integración continua caza un fichero incompleto en vez de caer al inglés en silencio.
 
 ## Desarrollo
 

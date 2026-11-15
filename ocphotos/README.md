@@ -41,7 +41,9 @@ El índice y las miniaturas los sirve el módulo `photos` de
 - **Carpetas**: navegación por el árbol de carpetas de OpenCloud (derivado del
   índice) con migas de pan, subcarpetas y fotos.
 - **i18n**: traducciones al español en `l10n/translations.json` (sigue el idioma
-  del host).
+  del host). Para añadir otro idioma, copia el bloque `es` con las mismas claves y
+  los marcadores `%{n}` y `%{month}` intactos. Un test (`src/l10n.spec.ts`) rechaza
+  los bloques incompletos. Detalle en el [README raíz](../README.es.md#traducciones).
 - Registrada en el **conmutador de aplicaciones** (appMenuItem).
 
 Pendiente: caras/CLIP (microservicio ML).
