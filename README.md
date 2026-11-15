@@ -159,6 +159,18 @@ served by `ocapps`, so it needs the backend and the proxy route above.
   while the web app shows photos, the scanner has nothing indexed for that account
   yet: check `OCAPPS_PHOTOS_SCAN_ROOT` and trigger a rescan.
 
+## Translations
+
+The UI strings live in `ocphotos/l10n/translations.json`, one block per language
+(`es` today) keyed by the English source string, and the host picks the block that
+matches its own locale. Anything missing falls back to English.
+
+To add a language, copy the `es` block, translate the values and leave the keys
+untouched. Placeholders such as `%{n}` and `%{month}` stay as they are. A unit test
+(`ocphotos/src/l10n.spec.ts`) fails when a block misses a key, carries one the
+reference does not have, drops a placeholder or leaves a value empty, so an
+incomplete file turns CI red instead of falling back silently.
+
 ## Development
 
 ```bash
