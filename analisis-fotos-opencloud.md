@@ -236,7 +236,7 @@ Esas limitaciones describen la etapa 1. La extensión de hoy toma los datos del 
 
 ---
 
-## 13. Estado a 29 de octubre de 2026: v1.6.1 en producción
+## 13. Estado a 15 de noviembre de 2026: v1.6.3 en producción
 
 Este apartado sustituye a las limitaciones descritas en §12 y corrige la lista de pendientes de §11.
 
@@ -252,13 +252,13 @@ Este apartado sustituye a las limitaciones descritas en §12 y corrige la lista 
 
 **Calidad e infraestructura**, que antes no existía:
 
-- 245 tests unitarios en la extensión (vitest con happy-dom, 20 ficheros) con 95,65 % de sentencias, y umbrales de cobertura que rompen el build si bajan. El cliente de la API está al 98,75 %, todas las vistas pasan del 92 % y la tabla de rutas resuelve los doce imports perezosos en los tests, así que un módulo mal exportado no llega al navegador.
+- 256 tests unitarios en la extensión (vitest con happy-dom, 21 ficheros) con 95,4 % de sentencias, y umbrales de cobertura que rompen el build si bajan. El cliente de la API está al 97,7 %, todas las vistas pasan del 92 % y la tabla de rutas resuelve los doce imports perezosos en los tests, así que un módulo mal exportado no llega al navegador. Un test más comprueba la paridad de los bloques de traducción: un idioma al que le falte una clave, o que pierda un marcador `%{n}`, rompe la suite.
 - 30 tests en la PWA (vitest con jsdom y Testing Library) con 97,68 % de sentencias sobre los ficheros con lógica.
-- Integración continua en cada pull request con dos trabajos (extensión y PWA), que ejecutan tipos, lint, tests, cobertura y build.
+- Integración continua en cada pull request con tres trabajos: extensión (overrides, tipos, lint, tests con cobertura y build), PWA (lint, tests con cobertura y build) y un guardarraíl que falla si vuelve a aparecer un backend Go o un Dockerfile en este repo.
 - Dependabot agrupado por ecosistema para menores y parches, con los cambios mayores sueltos, y un guardarraíl que falla si el lockfile deja de fijar los `overrides` de seguridad.
 - Release por tag que genera el zip instalable, más la versión del manifiesto alineada con el tag.
 
-**Producción.** La 1.6.1 está desplegada en `drive.domatix.cloud` (contenedor 4125). Verificado en navegador real: el manifiesto servido declara 1.6.1, el timeline carga las fotos con sus miniaturas, el flujo "abrir con" desde Archivos abre el visor con la foto correcta y su pie EXIF, y un sidecar escrito a mano se refleja en el índice tras pedir un reescaneo. La 1.6.1 es un parche sobre la 1.6.0 que hace opaco el fondo del visor a pantalla completa: con el 96 por ciento de opacidad anterior se leía el host por debajo y el pie de la foto se solapaba con su chrome.
+**Producción.** La 1.6.3 está desplegada en `drive.domatix.cloud` (contenedor 4125) y el manifiesto público declara esa versión, comprobado por HTTP el 15 de noviembre de 2026. El repaso en navegador real (timeline con sus miniaturas, "abrir con" desde Archivos y un sidecar reflejado tras pedir un reescaneo) se hizo sobre la 1.6.1, que es la que introdujo el parche del visor: el fondo a pantalla completa pasó a ser opaco porque con el 96 por ciento anterior se leía el host por debajo y el pie de la foto se solapaba con su chrome. Desde entonces, la 1.6.2 trajo los arreglos del timeline (rail de años sin el calendario, throttle del rescaneo, reintento y deduplicado de miniaturas, timeout en las llamadas y scrollbar visible), el icono y el estilo de OpenCloud 9 y un lote de dependencias, y la 1.6.3 sumó otro lote de dependencias, la documentación del cliente Android y un guardarraíl que impide publicar un zip cuya versión no coincida con el tag.
 
 **Pendiente real**, revisado contra el código y no contra notas antiguas:
 
