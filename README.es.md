@@ -25,7 +25,7 @@ independiente que habla con OpenCloud por WebDAV/Graph/OIDC, la misma forma que 
 
 ## Estado
 
-La extensión nativa es la que se usa a diario: versión 1.6.5, desplegada en
+La extensión nativa es la que se usa a diario: versión 1.6.6, desplegada en
 `drive.domatix.cloud`. Cubre timeline por días, recuerdos, explorar, álbumes, lugares, archivo,
 duplicados, etiquetas, carpetas, mapa, favoritos y visor a pantalla completa con vídeo y descarga.
 El índice recorre **todos los espacios** que ve el usuario (personal, espacios de proyecto y
