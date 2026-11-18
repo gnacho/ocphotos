@@ -7,6 +7,7 @@ import type { FolderListing, Photo } from '../composables/usePhotoLibrary'
 const state = vi.hoisted(() => ({
   previews: { value: {} as Record<string, string> },
   fetchFolder: vi.fn(),
+  fetchSpaces: vi.fn(),
   ensurePreview: vi.fn(),
   ensureOriginal: vi.fn(),
   toggleFavorite: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('../composables/usePhotoLibrary', async (importOriginal) => {
     usePhotoLibrary: () => ({
       previews: state.previews,
       fetchFolder: state.fetchFolder,
+      fetchSpaces: state.fetchSpaces,
       ensurePreview: state.ensurePreview,
       ensureOriginal: state.ensureOriginal,
       toggleFavorite: state.toggleFavorite,
@@ -79,6 +81,7 @@ beforeEach(() => {
   state.fetchFolder.mockReset().mockResolvedValue(
     listing('', [{ name: 'Fotos', path: 'Fotos', count: 12 }], [photo(1), photo(2, true)])
   )
+  state.fetchSpaces.mockReset().mockResolvedValue([])
   state.ensurePreview.mockReset().mockResolvedValue('')
   state.ensureOriginal.mockReset().mockResolvedValue('')
 })
@@ -88,7 +91,7 @@ describe('FoldersView', () => {
     const wrapper = mountView()
     await flush()
 
-    expect(state.fetchFolder).toHaveBeenCalledWith('')
+    expect(state.fetchFolder).toHaveBeenCalledWith('', '')
     expect(wrapper.find('.folders-crumb').text()).toBe('Personal space')
     expect(wrapper.findAll('.folders-crumb')).toHaveLength(1)
   })
@@ -143,7 +146,7 @@ describe('FoldersView', () => {
     await wrapper.find('.folders-card').trigger('click')
     await flush()
 
-    expect(state.fetchFolder).toHaveBeenLastCalledWith('Fotos')
+    expect(state.fetchFolder).toHaveBeenLastCalledWith('Fotos', '')
     const crumbs = wrapper.findAll('.folders-crumb')
     expect(crumbs.map((c) => c.text())).toEqual(['Personal space', 'Fotos'])
     expect(wrapper.find('.folders-card-name').text()).toBe('Verano')
@@ -159,7 +162,7 @@ describe('FoldersView', () => {
     await wrapper.findAll('.folders-crumb')[0].trigger('click')
     await flush()
 
-    expect(state.fetchFolder).toHaveBeenCalledWith('')
+    expect(state.fetchFolder).toHaveBeenCalledWith('', '')
     expect(wrapper.findAll('.folders-crumb')).toHaveLength(1)
   })
 
@@ -183,7 +186,7 @@ describe('FoldersView', () => {
     await wrapper.findAll('.folders-crumb')[1].trigger('click')
     await flush()
 
-    expect(state.fetchFolder).toHaveBeenCalledWith('Fotos')
+    expect(state.fetchFolder).toHaveBeenCalledWith('Fotos', '')
     expect(wrapper.findAll('.folders-crumb')).toHaveLength(2)
   })
 
@@ -215,5 +218,36 @@ describe('FoldersView', () => {
     await img.trigger('error')
 
     expect((img.element as HTMLImageElement).style.opacity).toBe('0.15')
+  })
+
+  it('offers a space selector only when the user has more than one space', async () => {
+    const wrapper = mountView()
+    await flush()
+    expect(wrapper.find('.folders-space').exists()).toBe(false)
+
+    state.fetchSpaces.mockResolvedValue([
+      { id: 'p1', name: 'Personal', type: 'personal', count: 12 },
+      { id: 'k1', name: 'Familia', type: 'project', count: 4 }
+    ])
+    const withSpaces = mountView()
+    await flush()
+    const select = withSpaces.find('.folders-space')
+    expect(select.exists()).toBe(true)
+    expect(select.findAll('option')).toHaveLength(3)
+  })
+
+  it('lists the folders of the selected space and names it in the breadcrumb', async () => {
+    state.fetchSpaces.mockResolvedValue([
+      { id: 'p1', name: 'Personal', type: 'personal', count: 12 },
+      { id: 'k1', name: 'Familia', type: 'project', count: 4 }
+    ])
+    const wrapper = mountView()
+    await flush()
+
+    await wrapper.find('.folders-space').setValue('k1')
+    await flush()
+
+    expect(state.fetchFolder).toHaveBeenLastCalledWith('', 'k1')
+    expect(wrapper.find('.folders-crumb').text()).toBe('Familia')
   })
 })

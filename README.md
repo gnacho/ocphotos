@@ -47,6 +47,9 @@ the metadata index (EXIF, GPS, tags, albums, hashes) and generates thumbnails, i
   cached in SQLite).
 - **Tags**: manual tags, added from the viewer; tag list with counts.
 - **Folders**: browse the real OpenCloud folder tree (derived from the index) with breadcrumbs.
+- **Spaces**: the scan covers every space the user can see (personal, project spaces and
+  shares), photos keep the space they live in, and the timeline and Folders have a space
+  filter when there is more than one.
 - **Map**: photo **thumbnail markers** with count badges, grouped by place; click opens the photos.
 - **Duplicates**: perceptual hashes (dHash) to find near-identical photos.
 - **Archive**: hide photos from the timeline and keep them in their own view.

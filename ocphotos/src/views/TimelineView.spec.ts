@@ -86,6 +86,8 @@ interface Options {
   highlights?: Photo[]
   calendarFails?: boolean
   highlightsFail?: boolean
+  spaces?: { id: string; name: string; type: string; count: number }[]
+  spacesFail?: boolean
 }
 
 const makeLib = (over: Options = {}) => {
@@ -96,10 +98,15 @@ const makeLib = (over: Options = {}) => {
     months: ref(over.months ?? []),
     exhausted: ref(over.exhausted ?? false),
     startAt: ref<number | null>(over.startAt ?? null),
+    space: ref(''),
     previews: ref<Record<string, string>>({}),
     init: vi.fn(() => Promise.resolve()),
     loadMore: vi.fn(() => Promise.resolve()),
     jumpTo: vi.fn(() => Promise.resolve()),
+    setSpace: vi.fn(() => Promise.resolve()),
+    fetchSpaces: vi.fn(() =>
+      over.spacesFail ? Promise.reject(new Error('spaces down')) : Promise.resolve(over.spaces ?? [])
+    ),
     rescan: vi.fn(() => Promise.resolve()),
     startWatching: vi.fn(),
     ensurePreview: vi.fn(() => Promise.resolve()),
@@ -435,5 +442,45 @@ describe('TimelineView', () => {
     lib.previews.value = { '5|400': 'https://example.test/5.jpg' }
     await nextTick()
     expect(wrapper.find('.photos-item img').attributes('src')).toBe('https://example.test/5.jpg')
+  })
+
+  it('offers a space selector only when the user has more than one space', async () => {
+    const lib = makeLib({ spaces: [{ id: 'p1', name: 'Personal', type: 'personal', count: 3 }] })
+    const wrapper = mountView(lib)
+    await flush()
+    expect(wrapper.find('.photos-space').exists()).toBe(false)
+
+    lib.fetchSpaces.mockResolvedValue([
+      { id: 'p1', name: 'Personal', type: 'personal', count: 3 },
+      { id: 'k1', name: 'Familia', type: 'project', count: 2 }
+    ] as never)
+    const withSpaces = mountView(lib)
+    await flush()
+    const select = withSpaces.find('.photos-space')
+    expect(select.exists()).toBe(true)
+    expect(select.findAll('option')).toHaveLength(3)
+    expect(select.findAll('option')[2].text()).toBe('Familia (2)')
+  })
+
+  it('filters the timeline by the selected space', async () => {
+    const lib = makeLib({
+      spaces: [
+        { id: 'p1', name: 'Personal', type: 'personal', count: 3 },
+        { id: 'k1', name: 'Familia', type: 'project', count: 2 }
+      ]
+    })
+    const wrapper = mountView(lib)
+    await flush()
+
+    await wrapper.find('.photos-space').setValue('k1')
+    expect(lib.setSpace).toHaveBeenCalledWith('k1')
+  })
+
+  it('survives a backend without the spaces endpoint', async () => {
+    const lib = makeLib({ spacesFail: true })
+    const wrapper = mountView(lib)
+    await flush()
+    expect(wrapper.find('.photos-space').exists()).toBe(false)
+    expect(lib.fetchSpaces).toHaveBeenCalled()
   })
 })

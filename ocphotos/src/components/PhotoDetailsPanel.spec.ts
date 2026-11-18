@@ -192,4 +192,20 @@ describe('PhotoDetailsPanel', () => {
     await wrapper.find('.details-close').trigger('click')
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
+
+  it('shows the space of the photo when the index knows it', async () => {
+    const wrapper = mountPanel(photo({ spaceName: 'Familia', spaceId: 'k1', spaceType: 'project' }))
+    await flush()
+    const terms = wrapper.findAll('dt').map((t) => t.text())
+    const values = wrapper.findAll('dd').map((t) => t.text())
+    const at = terms.indexOf('Space')
+    expect(at).toBeGreaterThanOrEqual(0)
+    expect(values[at]).toBe('Familia')
+  })
+
+  it('hides the space row for photos indexed before spaces were tracked', async () => {
+    const wrapper = mountPanel(photo())
+    await flush()
+    expect(wrapper.findAll('dt').map((t) => t.text())).not.toContain('Space')
+  })
 })

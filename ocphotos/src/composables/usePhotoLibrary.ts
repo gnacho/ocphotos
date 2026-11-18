@@ -17,6 +17,9 @@ export interface Photo {
   mediaType: string
   isVideo: boolean
   takenAt: number // segundos
+  spaceId?: string
+  spaceName?: string
+  spaceType?: string
   width: number
   height: number
   camera?: string
@@ -70,6 +73,14 @@ export interface FolderListing {
   assets: Photo[]
 }
 
+/** Espacio (drive) de OpenCloud con fotos indexadas: personal, proyecto o compartido. */
+export interface Space {
+  id: string
+  name: string
+  type: string
+  count: number
+}
+
 export interface CalendarMonth {
   month: number
   count: number
@@ -87,6 +98,9 @@ interface ApiAsset {
   filename: string
   mediaType: string
   takenAt: number
+  spaceId?: string
+  spaceName?: string
+  spaceType?: string
   width: number
   height: number
   camera?: string
@@ -109,6 +123,9 @@ const toPhoto = (a: ApiAsset): Photo => ({
   mediaType: a.mediaType,
   isVideo: a.mediaType === 'video',
   takenAt: a.takenAt,
+  spaceId: a.spaceId,
+  spaceName: a.spaceName,
+  spaceType: a.spaceType,
   width: a.width,
   height: a.height,
   camera: a.camera,
@@ -130,6 +147,8 @@ const state = {
   error: ref<string | null>(null),
   exhausted: ref(false),
   startAt: ref<number | null>(null), // null = desde ahora (Rewind)
+  // espacio seleccionado en el timeline ('' = todos: personal, proyectos y compartidos)
+  space: ref<string>(''),
   initialized: false
 }
 
@@ -179,6 +198,7 @@ export function usePhotoLibrary() {
     state.error.value = null
     try {
       const q = new URLSearchParams({ limit: String(PAGE_SIZE) })
+      if (state.space.value) q.set('space', state.space.value)
       const last = state.photos.value[state.photos.value.length - 1]
       if (!reset && last) {
         q.set('before_taken', String(last.takenAt))
@@ -544,10 +564,30 @@ export function usePhotoLibrary() {
   }
 
   // --- Carpetas ---
-  const fetchFolder = async (path = ''): Promise<FolderListing> => {
-    const res = await api(`/api/folders?path=${encodeURIComponent(path)}`)
+  const fetchFolder = async (path = '', space = ''): Promise<FolderListing> => {
+    const q = new URLSearchParams({ path })
+    if (space) q.set('space', space)
+    const res = await api(`/api/folders?${q.toString()}`)
     const json = (await res.json()) as { path?: string; folders?: FolderEntry[]; assets?: ApiAsset[] }
     return { path: json.path ?? '', folders: json.folders ?? [], assets: (json.assets ?? []).map(toPhoto) }
+  }
+
+  // --- Espacios (drives de OpenCloud con fotos indexadas) ---
+  const fetchSpaces = async (): Promise<Space[]> => {
+    const res = await api('/api/spaces')
+    const json = (await res.json()) as { spaces?: Space[] }
+    return json.spaces ?? []
+  }
+
+  /**
+   * Filtra el timeline por espacio y lo recarga desde el principio. '' = todos
+   * los espacios. El rail (años) no se filtra: es el calendario completo.
+   */
+  const setSpace = async (id: string): Promise<void> => {
+    if (state.space.value === id) return
+    state.space.value = id
+    state.exhausted.value = false
+    await loadPage(true)
   }
 
   // --- Lugares ---
@@ -609,11 +649,14 @@ export function usePhotoLibrary() {
     error: state.error,
     exhausted: state.exhausted,
     startAt: state.startAt,
+    space: state.space,
     days,
     months,
     init,
     loadMore,
     jumpTo,
+    setSpace,
+    fetchSpaces,
     fetchCalendar,
     startWatching,
     stopWatching,

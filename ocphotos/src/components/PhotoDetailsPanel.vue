@@ -27,6 +27,10 @@
             <dt v-text="$gettext('Size')" />
             <dd v-text="sizeLabel" />
           </template>
+          <template v-if="photo.spaceName">
+            <dt v-text="$gettext('Space')" />
+            <dd v-text="photo.spaceName" />
+          </template>
           <dt v-text="$gettext('Type')" />
           <dd v-text="photo.isVideo ? $gettext('Video') : $gettext('Photo')" />
         </dl>

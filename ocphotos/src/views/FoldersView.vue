@@ -2,8 +2,19 @@
   <div class="folders-view">
     <div class="folders-toolbar">
       <h1 v-text="$gettext('Folders')" />
+      <select
+        v-if="spaces.length > 1"
+        class="folders-space"
+        :aria-label="$gettext('Space')"
+        :title="$gettext('Space')"
+        :value="space"
+        @change="onSpaceChange"
+      >
+        <option value="" v-text="$gettext('Personal space')" />
+        <option v-for="s in spaces" :key="s.id" :value="s.id" v-text="`${s.name} (${s.count})`" />
+      </select>
       <nav class="folders-crumbs">
-        <button class="folders-crumb" @click="go('')" v-text="$gettext('Personal space')" />
+        <button class="folders-crumb" @click="go('')" v-text="rootLabel" />
         <template v-for="(seg, i) in segments" :key="i">
           <span class="folders-sep">/</span>
           <button class="folders-crumb" @click="go(segments.slice(0, i + 1).join('/'))" v-text="seg" />
@@ -51,14 +62,15 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref } from 'vue'
-import { usePhotoLibrary, errorMessage, FolderEntry, Photo } from '../composables/usePhotoLibrary'
+import { useGettext } from 'vue3-gettext'
+import { usePhotoLibrary, errorMessage, FolderEntry, Photo, Space } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 
 export default defineComponent({
   name: 'FoldersView',
   components: { ViewerOverlay },
   setup() {
-    const { fetchFolder, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
+    const { fetchFolder, fetchSpaces, ensurePreview, ensureOriginal, previews } = usePhotoLibrary()
 
     const loading = ref(true)
     const error = ref<string | null>(null)
@@ -67,6 +79,16 @@ export default defineComponent({
     const assets = ref<Photo[]>([])
     const viewerList = ref<Photo[] | null>(null)
     const viewerIndex = ref(0)
+    // Espacios con fotos: '' = el personal (raíz de siempre). El selector solo
+    // aparece si el usuario tiene más de uno (issue #145).
+    const spaces = ref<Space[]>([])
+    const space = ref('')
+    const { $gettext } = useGettext()
+    const rootLabel = computed(() => {
+      if (!space.value) return $gettext('Personal space')
+      const found = spaces.value.find((s) => s.id === space.value)
+      return found ? found.name : $gettext('Personal space')
+    })
 
     const segments = computed(() => cwd.value.split('/').filter(Boolean))
     const thumbSrc = (p: Photo) => previews.value[`${p.id}|400`]
@@ -76,7 +98,7 @@ export default defineComponent({
       cwd.value = path
       error.value = null
       try {
-        const listing = await fetchFolder(path)
+        const listing = await fetchFolder(path, space.value)
         folders.value = listing.folders
         assets.value = listing.assets
         for (const p of assets.value) void ensurePreview(p, 400)
@@ -85,6 +107,11 @@ export default defineComponent({
       } finally {
         loading.value = false
       }
+    }
+
+    const onSpaceChange = (e: Event): void => {
+      space.value = (e.target as HTMLSelectElement).value
+      void load('')
     }
 
     const go = (path: string): void => {
@@ -102,13 +129,19 @@ export default defineComponent({
       el.onerror = null
     }
 
-    onMounted((): void => {
+    onMounted(async () => {
+      try {
+        spaces.value = await fetchSpaces()
+      } catch {
+        /* sin selector de espacio si el backend no lo sirve */
+      }
       void load('')
     })
 
     return {
       loading, error, folders, assets, segments, viewerList, viewerIndex,
-      thumbSrc, go, openPhoto, onImgError, ensurePreview, ensureOriginal
+      thumbSrc, go, openPhoto, onImgError, ensurePreview, ensureOriginal,
+      spaces, space, onSpaceChange, rootLabel
     }
   }
 })
@@ -121,6 +154,11 @@ export default defineComponent({
   padding: 8px 16px; border-bottom: 1px solid var(--oc-role-outline-variant, #bfc8cc);
 }
 .folders-toolbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
+.folders-space {
+  max-width: 220px; padding: 4px 8px; font-size: 0.8rem;
+  color: var(--oc-role-on-surface, inherit); background: var(--oc-role-surface, #fff);
+  border: 1px solid var(--oc-role-outline-variant, #bfc8cc); border-radius: 6px;
+}
 .folders-crumbs { display: flex; align-items: center; gap: 2px; font-size: 0.85rem; }
 .folders-crumb { border: 0; background: none; cursor: pointer; color: var(--oc-role-primary, #00677f); padding: 0 2px; }
 .folders-sep { color: var(--oc-role-on-surface-variant, #40484c); }
