@@ -172,4 +172,52 @@ describe('usePhotoLibrary', () => {
 
     await expect(lib.resolveFromFiles('personal/Fotos/IMG.jpg')).resolves.toBeNull()
   })
+
+  it('keeps the space of every photo', async () => {
+    fetchMock.mockResolvedValue(
+      response({ assets: [asset({ spaceId: 'k1', spaceName: 'Familia', spaceType: 'project' })] })
+    )
+    const lib = await load()
+
+    await lib.init()
+
+    expect(lib.photos.value[0]).toMatchObject({ spaceId: 'k1', spaceName: 'Familia', spaceType: 'project' })
+  })
+
+  it('sends the selected space as a filter and reloads the timeline', async () => {
+    fetchMock.mockResolvedValue(response({ assets: [asset()] }))
+    const lib = await load()
+    await lib.init()
+    fetchMock.mockClear()
+
+    await lib.setSpace('k1')
+
+    expect(lib.space.value).toBe('k1')
+    const [url] = fetchMock.mock.calls[0]
+    expect(url).toContain('space=k1')
+    expect(url).toContain(`limit=${PAGE_SIZE}`)
+    // no keyset cursor on the reload: it starts from the top again
+    expect(url).not.toContain('before_taken')
+  })
+
+  it('lists the spaces of the index', async () => {
+    fetchMock.mockResolvedValue(
+      response({ spaces: [{ id: 'k1', name: 'Familia', type: 'project', count: 4 }] })
+    )
+    const lib = await load()
+
+    const spaces = await lib.fetchSpaces()
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/ocphotos-api/api/spaces')
+    expect(spaces).toEqual([{ id: 'k1', name: 'Familia', type: 'project', count: 4 }])
+  })
+
+  it('asks the folders of a space', async () => {
+    fetchMock.mockResolvedValue(response({ path: '', folders: [], assets: [] }))
+    const lib = await load()
+
+    await lib.fetchFolder('Fotos', 'k1')
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/ocphotos-api/api/folders?path=Fotos&space=k1')
+  })
 })

@@ -85,7 +85,10 @@
     "Search": "Buscar",
     "Search by file, camera, path…": "Buscar por fichero, cámara, ruta…",
     "Searching…": "Buscando…",
-    "This album is empty": "Este álbum está vacío"
+    "This album is empty": "Este álbum está vacío",
+    "All spaces": "Todos los espacios",
+    "Space": "Espacio",
+    "Personal space": "Espacio personal"
   },
   "de": {
     "Add": "Hinzufügen",
@@ -173,6 +176,9 @@
     "Search": "Suchen",
     "Search by file, camera, path…": "Nach Datei, Kamera, Pfad suchen…",
     "Searching…": "Suche…",
-    "This album is empty": "Dieses Album ist leer"
+    "This album is empty": "Dieses Album ist leer",
+    "All spaces": "Alle Spaces",
+    "Space": "Space",
+    "Personal space": "Persönlicher Space"
   }
 }

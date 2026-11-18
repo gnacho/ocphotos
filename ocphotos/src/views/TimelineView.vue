@@ -4,6 +4,17 @@
       <h1 class="photos-title" v-text="$gettext('Photos')" />
       <span v-if="loading" class="photos-progress" v-text="$gettext('Loading…')" />
       <span v-else class="photos-count" v-text="countLabel" />
+      <select
+        v-if="spaces.length > 1"
+        class="photos-space"
+        :aria-label="$gettext('Space')"
+        :title="$gettext('Space')"
+        :value="space"
+        @change="onSpaceChange"
+      >
+        <option value="" v-text="$gettext('All spaces')" />
+        <option v-for="s in spaces" :key="s.id" :value="s.id" v-text="`${s.name} (${s.count})`" />
+      </select>
       <oc-button appearance="raw" :aria-label="$gettext('Rescan')" @click="rescan">
         <oc-icon name="refresh" size="small" />
       </oc-button>
@@ -96,7 +107,7 @@
 <script lang="ts">
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useGettext } from 'vue3-gettext'
-import { usePhotoLibrary, Photo, CalendarYear } from '../composables/usePhotoLibrary'
+import { usePhotoLibrary, Photo, CalendarYear, Space } from '../composables/usePhotoLibrary'
 import ViewerOverlay from '../components/ViewerOverlay.vue'
 import AlbumPicker from '../components/AlbumPicker.vue'
 
@@ -117,10 +128,17 @@ export default defineComponent({
   setup() {
     const { $gettext } = useGettext()
     const {
-      photos, loading, error, months, exhausted, startAt,
+      photos, loading, error, months, exhausted, startAt, space,
       init, loadMore, jumpTo, fetchCalendar, fetchHighlights, rescan, previews, ensurePreview, ensureOriginal,
-      startWatching, stopWatching
+      startWatching, stopWatching, fetchSpaces, setSpace
     } = usePhotoLibrary()
+
+    // Espacios con fotos del usuario (personal, proyectos y compartidos). El
+    // selector solo aparece si hay más de uno: con un único espacio sobra.
+    const spaces = ref<Space[]>([])
+    const onSpaceChange = (e: Event): void => {
+      void setSpace((e.target as HTMLSelectElement).value)
+    }
 
     const sentinel = ref<HTMLElement | null>(null)
     const scrollEl = ref<HTMLElement | null>(null)
@@ -255,6 +273,11 @@ export default defineComponent({
       await init()
       startWatching()
       try {
+        spaces.value = await fetchSpaces()
+      } catch {
+        /* sin selector de espacio si el backend no lo sirve (versión anterior) */
+      }
+      try {
         years.value = await fetchCalendar()
       } catch {
         /* sin scrubber si falla */
@@ -292,7 +315,7 @@ export default defineComponent({
     return {
       photos, loading, error, months, years, railYears, topYear, startAt, sentinel, scrollEl, onThisDay, otdTitle, jumpToPhoto, albumFor, countLabel,
       viewerList, viewerIndex, openViewer, formatDay, monthName, onImgError, jumpTo, jumpToYear, jumpToMonth, toggleYear, openYear, dayRows,
-      rescan, thumbSrc, ensurePreview, ensureOriginal
+      rescan, thumbSrc, ensurePreview, ensureOriginal, spaces, space, onSpaceChange
     }
   }
 })
@@ -306,6 +329,11 @@ export default defineComponent({
 }
 .photos-title { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .photos-progress, .photos-count { font-size: 0.8rem; color: var(--oc-role-on-surface-variant, #40484c); }
+.photos-space {
+  margin-left: auto; max-width: 220px; padding: 4px 8px; font-size: 0.8rem;
+  color: var(--oc-role-on-surface, inherit); background: var(--oc-role-surface, #fff);
+  border: 1px solid var(--oc-role-outline-variant, #bfc8cc); border-radius: 6px;
+}
 .photos-error { padding: 16px; color: var(--oc-role-error, #ba1a1a); }
 .photos-empty {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
